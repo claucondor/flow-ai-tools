@@ -21,6 +21,25 @@ The return type `[AnyStruct]` is the same regardless of how many distinct event 
 
 One legitimate use of raw `events()` is a sanity-check at the very top of a new test file. Run the test, print `events()`, inspect the output, and use it to decide which event types are worth asserting on. That is a one-time exploratory step, not a permanent assertion — replace the `events()` print with targeted `eventsOfType` assertions before the test lands in the repository.
 
+## Cumulative semantics — `Test.eventsOfType`
+
+Events emitted in a test file are CUMULATIVE for the entire file run, not per-test. `Test.eventsOfType(Type<MyContract.MyEvent>())` returns ALL events of that type emitted by ANY test in the file (and by `setup()`, `beforeEach()`, etc.) up to the point of the call.
+
+To assert "this transaction emitted N events", snapshot the length BEFORE running the transaction and subtract:
+
+```cadence
+access(all) fun testTipEmitsEvent() {
+    let before = Test.eventsOfType(Type<TipJar.TipSent>()).length
+    
+    // ... run the transaction that should emit one TipSent ...
+    
+    let after = Test.eventsOfType(Type<TipJar.TipSent>()).length
+    Test.assertEqual(after - before, 1)
+}
+```
+
+Querying for an event type that was never emitted returns an empty array (length 0), not an error.
+
 ## Filtering by Type
 
 ```cadence

@@ -115,15 +115,44 @@ error: cannot use incompatible type when conforming to FungibleToken
 
 ## Deployment Order in setup()
 
-Strictly leaves-first:
+Two categories of contracts are involved:
 
-1. `Burner` — utility, depended on by FungibleToken's burn machinery.
-2. `FungibleToken` — the interface itself.
-3. `FungibleTokenMetadataViews` — utility for FT metadata (most concrete FTs reference this).
-4. Concrete FT (`TestToken`, `ExampleToken`, etc.).
-5. The contract under test (e.g. `TipJar`) which imports the concrete FT.
+**Dependency contracts** (`Burner`, `FungibleToken`, `FungibleTokenMetadataViews`, `NonFungibleToken`, `MetadataViews`, `ViewResolver`):
+- Declared in `flow.json` `dependencies` (typically pulled via `flow dependencies install`).
+- Add a `testing` alias to each one's entry in `flow.json`.
+- These **AUTO-LOAD** when imported by your contracts. **Do not** call `Test.deployContract` on them — the framework will fail with `account with address 0x... not found` because that address is already provisioned for the dependency.
 
-For NFT-side tests, the same logic applies: `MetadataViews` and `ViewResolver` first, then `NonFungibleToken`, then your concrete NFT contract, then any consumer.
+**Project contracts** (your `TestToken.cdc`, `TipJar.cdc`, etc.):
+- Declared in `flow.json` `contracts` with `source` and `testing` alias.
+- These do NOT auto-deploy. You MUST call `Test.deployContract(name, path, arguments)` in `setup()` for each, in dependency order.
+
+Example `setup()` for a TipJar consumer (only project contracts deployed):
+
+```cadence
+import Test
+import "FungibleToken"
+import "TestToken"
+import "TipJar"
+
+access(all) fun setup() {
+    // Burner, FungibleToken, ViewResolver auto-load via testing alias — DO NOT deploy them.
+    
+    // Project contracts deploy explicitly:
+    var err = Test.deployContract(
+        name: "TestToken",
+        path: "../contracts/TestToken.cdc",
+        arguments: []
+    )
+    Test.expect(err, Test.beNil())
+    
+    err = Test.deployContract(
+        name: "TipJar",
+        path: "../contracts/TipJar.cdc",
+        arguments: []
+    )
+    Test.expect(err, Test.beNil())
+}
+```
 
 Pull standard sources to disk with `flow dependencies install` so they live under `imports/<addr>/<Name>.cdc` and can be referenced from `flow.json` by source path.
 
@@ -133,6 +162,6 @@ Pull standard sources to disk with `flow dependencies install` so they live unde
 |---|---|---|
 | `cannot find variable in this scope: FungibleToken` | Tried to call `FungibleToken.X(...)` as if it were a concrete contract. | Call the concrete implementation instead, e.g. `TestToken.createEmptyVault(...)`. |
 | `cannot find declaration FungibleToken in <path>` | `flow.json` has no `FungibleToken` contract entry, or the source path doesn't exist on disk. | Add `FungibleToken` to `flow.json` `contracts` with `source` + `testing` alias; run `flow dependencies install` to materialize the source. |
-| `account with address 0000000000000002 not found` | A system contract the chain bootstrap expects (FungibleToken at index 2) has not been deployed in the test fixture. | Add `FungibleToken` to `flow.json` and deploy it in `setup()` before any FT consumer. |
+| `account with address 0000000000000XXX not found` | You called `Test.deployContract` on a dependency contract that already has a `testing` alias — the framework auto-loaded it into that address and the redeploy attempt collides. | Remove the `Test.deployContract` call for that dependency. Only project contracts need explicit deployment; dependencies AUTO-LOAD via `testing` alias. |
 | `cannot use incompatible type when conforming to FungibleToken` | `createEmptyVault` signature mismatch — usually missing the `vaultType: Type` parameter on the contract-level method. | Match the interface exactly: `access(all) fun createEmptyVault(vaultType: Type): @{FungibleToken.Vault}`. |
 | `could not resolve address of contract X: contract X not found` | Contract X has a `testing` alias in `flow.json` but was never `Test.deployContract`-ed. | Add the missing `Test.deployContract("X", "<path>", [])` to `setup()`. |

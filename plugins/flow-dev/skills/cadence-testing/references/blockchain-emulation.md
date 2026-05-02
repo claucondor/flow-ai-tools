@@ -27,6 +27,8 @@ access(all) let user = Test.createAccount()
 
 `Test.serviceAccount()` returns the implicit account that owns the protocol contracts and holds the testing framework's privileged keys. Transactions signed by the service account can deploy core contracts or manipulate accounts that user accounts cannot; most tests only need it when setting up fixtures that rely on system-level authority.
 
+**Test framework service account is `0x0000000000000001`.** This differs from the emulator service account (`0xf8d6e0586b0a20c7`). Use `Test.serviceAccount()` to get this account; both `Test.serviceAccount()` and `Test.createAccount()` can sign transactions normally.
+
 Accounts are just keys plus an address — storage and capabilities live on them only after a transaction writes to them. A freshly created account has no fungible token vault, no NFT collection, and no resources at all until your test (or the contract's `init`) puts something there.
 
 A common pattern is to give every persistent role its own file-level account binding (`admin`, `minter`, `user`, `attacker`) and keep one-off accounts as locals inside the test that needs them. The names then read as documentation in the test body — `Test.Transaction(..., signers: [attacker], ...)` is self-explanatory in a way that `signers: [account3]` is not.
@@ -73,7 +75,7 @@ The deployed contract is registered under the `testing` alias from `flow.json`, 
 
 The `path` is relative to the test file, not to the project root. The `arguments` array is passed to the contract's `init` in declaration order, typed as `[AnyStruct]`. The deployed contract is registered under the `testing` alias declared in `flow.json`, so it becomes importable by name (`import "Counter"`) from the test file and from any scripts or transactions the test runs.
 
-When a contract under test imports another contract, the dependency must be deployed first. The framework deploys standard library contracts (`FungibleToken`, `NonFungibleToken`, `MetadataViews`, `ViewResolver`) automatically when they are imported, but anything else — including third-party contracts your project depends on — needs an explicit `deployContract` call earlier in `setup()`. Order the deployments by their dependency graph: leaves first, roots last.
+When a contract under test imports another contract, the dependency must be deployed first. The framework auto-loads dependency contracts that have a `testing` alias under the `dependencies` block in `flow.json` (typically `FungibleToken`, `NonFungibleToken`, `MetadataViews`, `ViewResolver`, `Burner`, `FungibleTokenMetadataViews`) — do NOT call `Test.deployContract` on those, it fails with `account with address 0x... not found` because the address is already provisioned. Project contracts under the `contracts` block always need an explicit `deployContract` call in `setup()`. Order the project deployments by their dependency graph: leaves first, roots last.
 
 Cyclic imports are not legal at deployment time — Cadence resolves a contract's imports before its `init` runs, so two contracts that import each other cannot both be deployed in any order. If you find yourself wanting that, the right fix is almost always to extract the shared types or interfaces into a third contract that both import.
 
@@ -115,6 +117,21 @@ A transaction whose `prepare` block declares two parameters needs two entries in
 `Test.executeTransaction` submits the transaction, commits a block, and returns a `TransactionResult` that behaves the same as a `ScriptResult` for assertion purposes: `Test.beSucceeded`, `Test.beFailed`, and `result.error!.message` all work identically. Events emitted by the transaction become visible via `Test.events` and `Test.eventsOfType` after the call returns, and any `log` statements the transaction or its callees executed surface in `Test.logs`.
 
 Argument values in the `arguments` array must match the transaction's declared parameter types exactly. Cadence does not coerce between numeric widths, so a transaction expecting a `UInt64` rejects a plain `42` (which the parser infers as `Int`). Cast at the call site — `42 as UInt64` — to keep type errors at the test boundary instead of hidden inside the transaction prelude.
+
+**Capabilities cannot be transaction arguments.** Trying to pass `Capability<&T>` produces `error: argument type is not importable: Capability<&T>`. This is a hard framework constraint (matches mainnet behavior). Capabilities must be looked up INSIDE the transaction body via `getAccount(addr).capabilities.get<...>(/public/...)`, never received as a parameter.
+
+**Hex literals are parsed as Int, not Address.** Passing `[0x0000000000000007]` to `Test.executeScript` or `Test.executeTransaction` fails with `invalid argument at index 0: expected value of type 'Address'`. Always wrap with `Address(...)` or use `account.address`:
+
+```cadence
+// WRONG — parses as Int
+Test.executeScript(script, [0x0000000000000007])
+
+// CORRECT
+Test.executeScript(script, [Address(0x0000000000000007)])
+Test.executeScript(script, [admin.address])  // also fine
+```
+
+**Authorizer/signer length must match exactly.** A `Test.Transaction` with `authorizers: [a.address, b.address], signers: [a]` (mismatched length) crashes the framework with a Go runtime panic and stack trace, NOT a graceful test error. Always validate `signers.length == authorizers.length` before constructing the transaction.
 
 ## Batch Execution
 
@@ -185,6 +202,18 @@ Test.commitBlock()
 `moveTime` and `commitBlock` are complementary, not interchangeable. `commitBlock` advances the block height but not the wall clock — it's the right tool when a contract cares about block numbers. `moveTime` advances the wall clock but not the block height — it's the right tool when a contract cares about timestamps. If the contract reads both `getCurrentBlock().height` and `getCurrentBlock().timestamp`, move time and then commit a block, in that order.
 
 `Fix64` accepts negative values, so `Test.moveTime(by: -3600.0)` rewinds the clock by an hour. That can be useful for testing a contract's behaviour around boundary conditions, but it can also surprise contracts that assume time only moves forward — use it with care, and only for the specific assertion that needs it.
+
+**Critical gotcha:** `getCurrentBlock().timestamp` and `getCurrentBlock().height` called DIRECTLY inside test functions return STALE values, even after `Test.moveTime` or `Test.commitBlock`. To read current time/height correctly inside a test, execute a script:
+
+```cadence
+let r = Test.executeScript(
+    "access(all) fun main(): UFix64 { return getCurrentBlock().timestamp }",
+    []
+)
+let now = r.returnValue! as! UFix64
+```
+
+This silently corrupts time-based assertions if you trust the direct call. Always go through `Test.executeScript` for current-block reads.
 
 ## Mocking via Contract Substitution
 

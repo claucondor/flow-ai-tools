@@ -184,6 +184,14 @@ concurrency:
 
 Drop that block alongside the `jobs:` key at the top of the workflow file. For `main` branch pushes you usually want every run to complete (so the history shows each commit's real status); key the `group:` on `github.head_ref || github.ref` to scope the cancellation to pull-request branches only.
 
+## flow cadence lint vs flow test
+
+**`flow cadence lint` does NOT resolve `flow.json` dependencies.** If a contract uses `import "FungibleToken"` (string import), lint reports `cannot find variable in this scope: FungibleToken` because it ignores the testing alias map. Lint catches syntax and unresolved-symbol errors within a single file but cannot do cross-contract type checking.
+
+**Use `flow test` for true semantic verification** — the test runner DOES resolve flow.json aliases and produces accurate compile errors when contracts conflict.
+
+For CI pipelines: use `flow cadence lint` only to catch blatant syntax/typo errors, and `flow test` (even with empty test bodies) to verify cross-contract types.
+
 ## Tips
 
 - **Local dev loop.** Use `flow test --name <pattern>` while iterating on a single failing test. It re-runs only tests whose name contains the pattern, which turns a full-suite run into a sub-second loop for tight TDD cycles. Drop the flag once the test passes and re-run the whole file to confirm the change did not break a sibling.
