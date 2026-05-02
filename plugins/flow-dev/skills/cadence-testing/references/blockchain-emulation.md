@@ -55,6 +55,22 @@ Test.expect(err, Test.beNil())
 
 `Test.deployContract(name:path:arguments:)` returns an optional `Error?`. A `nil` return means the deployment succeeded; a non-`nil` value carries the compile or runtime error. Always assert on the result — a silent deployment failure surfaces later as a confusing "contract not found" error from `executeScript` or `executeTransaction`, and debugging that is far more painful than a clear `Test.beNil` failure at setup.
 
+The full signature is exactly:
+
+```cadence
+fun deployContract(
+    name: String,
+    path: String,
+    arguments: [AnyStruct]
+): Error?
+```
+
+There is no `signer` parameter — the test framework deploys every contract under the implicit service account of the test blockchain. If you see `error: too many arguments`, you almost certainly added a fourth labeled argument (`signer:`, `account:`, `to:`) that does not exist in the API.
+
+The `name` must match the contract's declared name in source. The `path` is relative to the test file. The `arguments` array is `[AnyStruct]` — every entry must be a concrete value typed correctly for the contract's `init` parameters. Pass `[]` for contracts whose `init` takes no arguments.
+
+The deployed contract is registered under the `testing` alias from `flow.json`, which is what makes `import "ContractName"` resolve from inside the test, from any script the test runs, and from any later-deployed contract. If `flow.json` does not have a `testing` alias for the contract, deployment fails with `cannot find declaration <name>` regardless of whether the source path is correct.
+
 The `path` is relative to the test file, not to the project root. The `arguments` array is passed to the contract's `init` in declaration order, typed as `[AnyStruct]`. The deployed contract is registered under the `testing` alias declared in `flow.json`, so it becomes importable by name (`import "Counter"`) from the test file and from any scripts or transactions the test runs.
 
 When a contract under test imports another contract, the dependency must be deployed first. The framework deploys standard library contracts (`FungibleToken`, `NonFungibleToken`, `MetadataViews`, `ViewResolver`) automatically when they are imported, but anything else — including third-party contracts your project depends on — needs an explicit `deployContract` call earlier in `setup()`. Order the deployments by their dependency graph: leaves first, roots last.

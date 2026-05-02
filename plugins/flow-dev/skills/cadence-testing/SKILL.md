@@ -26,6 +26,7 @@ Write and run unit tests for Cadence smart contracts using the built-in `Test` c
 | Accounts, deployments, scripts, transactions, `reset`, `moveTime`, mocking | [blockchain-emulation.md](references/blockchain-emulation.md) |
 | Events and logs — reading, filtering, asserting | [events-and-logs.md](references/events-and-logs.md) |
 | Running tests, coverage, determinism, fork mode, CI | [coverage-and-ci.md](references/coverage-and-ci.md) |
+| Testing FT/NFT-dependent contracts: dep order, createEmptyVault, common errors | [ft-and-nft-testing.md](references/ft-and-nft-testing.md) |
 | Testing patterns, isolation, flakiness prevention, anti-patterns | [patterns.md](references/patterns.md) |
 
 ## Running Tests — Quick Reference

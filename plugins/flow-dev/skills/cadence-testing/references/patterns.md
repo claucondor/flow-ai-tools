@@ -182,6 +182,22 @@ Flakiness also hides behind shared file-level state. An `access(all) var` bindin
 
 When a test does occasionally fail, resist the temptation to re-run it until it passes and consider the diagnosis done. A flaky test is a bug report about the suite's assumptions; silencing it with a retry loop hides the bug until it shows up in production. Fix the source of non-determinism and the "flake" goes away permanently.
 
+## Cadence 1.0 Test Anti-Patterns
+
+These specifically arise from misunderstanding Cadence 1.0 semantics inside test files. Each one wasted real time in production agent runs.
+
+- **Calling a contract interface as if it were a contract.** `FungibleToken.createEmptyVault(...)` looks like a static call to a known contract, but `FungibleToken` is a contract *interface* — its methods may have no body, and the symbol is not a runtime value. Use the concrete contract: `TestToken.createEmptyVault(...)`, `FlowToken.createEmptyVault(...)`. The error message ("cannot find variable in this scope") is misleading; the import itself is fine, but the value `FungibleToken` is not callable.
+
+- **Adding a `signer:` parameter to `Test.deployContract`.** The signature is `(name: String, path: String, arguments: [AnyStruct]): Error?` — no fourth labeled parameter exists, no matter how convenient one would be. The framework always deploys under its internal service account. If you need different signers for transactions later, that's `Test.Transaction(..., signers: [...])`, not `deployContract`.
+
+- **Assuming standard contracts are auto-deployed.** Older docs and intuitions from emulator usage suggest that `import "FungibleToken"` Just Works. In a `flow test` run, `FungibleToken` (and its dependencies `Burner`, `FungibleTokenMetadataViews`) must be declared in `flow.json` with a `testing` alias and deployed via explicit `Test.deployContract` calls in `setup()`. The "cannot find" or "address not found" errors at test startup are the symptoms.
+
+- **Mismatched `createEmptyVault` signatures on a custom FT.** The `FungibleToken` interface requires two `createEmptyVault` declarations on a conforming contract: an instance method on the `Vault` resource (no args, returns `@{FungibleToken.Vault}`), and a contract-level method that takes `vaultType: Type` and returns `@{FungibleToken.Vault}`. Skipping the `vaultType` parameter on the contract-level one fails interface conformance.
+
+- **Using `flow cadence check`.** This subcommand does not exist. The Cadence sub-commands are `flow cadence lint` (static analysis without running) and `flow cadence language-server`. For static verification of a Cadence file, use `flow cadence lint cadence/contracts/MyContract.cdc` — it parses, type-checks, and reports issues without deploying anything.
+
+- **Confusing addresses 0x1–0x4 with the user range.** The testing blockchain reserves `0x01`–`0x04` for system contracts (service account, FungibleToken, FlowToken, FlowFees). Aliasing your contract to `0x02` clobbers FungibleToken's slot. Use `0x05`–`0x0E` for project contracts; multiple contracts on a single user address (e.g. `0x07`) is fine and matches the onflow/flow-ft convention.
+
 ## Anti-Patterns
 
 A handful of patterns look reasonable up close but corrode the suite over time:
