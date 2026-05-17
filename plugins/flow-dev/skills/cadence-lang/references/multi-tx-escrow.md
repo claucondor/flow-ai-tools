@@ -110,7 +110,7 @@ access(all) contract IntentEscrow {
         access(all) let depositor: Address
         access(all) let recipient: Address
         access(all) let deadline: UFix64        // unix seconds
-        access(all) var phase: Phase
+        access(self) var phase: Phase
         // Funds live INSIDE the resource. Single location. Linear ownership.
         access(self) var vault: @{FungibleToken.Vault}
 
@@ -125,6 +125,7 @@ access(all) contract IntentEscrow {
         }
 
         access(all) view fun balance(): UFix64 { return self.vault.balance }
+        access(all) view fun getPhase(): Phase { return self.phase }
 
         // ---- Funding phase -------------------------------------------------
         access(Deposit) fun deposit(from: @{FungibleToken.Vault}) {

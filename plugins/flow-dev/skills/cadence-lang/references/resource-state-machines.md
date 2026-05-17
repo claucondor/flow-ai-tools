@@ -197,27 +197,34 @@ Problems, in order of severity:
 
 Use an enum. Always.
 
-## Anti-pattern: `access(all) var phase` — anyone can flip the state
+## Anti-pattern: `access(all) var phase` — encapsulation violation
 
 ```cadence
-// ❌ CRITICAL: external mutation
+// ❌ AVOID: phase is publicly readable without an explicit getter contract
 access(all) resource OrderUnsafe {
-    access(all) var phase: Phase   // public AND var
+    access(all) var phase: Phase   // readable by any reference holder
 
     access(Settler) fun settle() {
         pre { self.phase == Phase.Active: "wrong phase" }
         // ...
     }
 }
-
-// In a transaction, anyone holding ANY reference to OrderUnsafe can do:
-let ref = &order as &OrderUnsafe
-ref.phase = Phase.Active   // bypasses settle()'s pre entirely
 ```
 
-`access(all) var` exposes the setter — the entitlement on `settle()` is useless
-because the attacker doesn't need to call `settle()`; they just write `phase`
-directly through any reference. The fix is two-fold:
+**Cadence 1.0 enforces this at compile time** (`fields with 'all' access cannot
+be directly assigned to`): external code cannot write `ref.phase = Phase.Active`
+through a plain `&OrderUnsafe` reference — the compiler rejects the assignment.
+The entitlement on `settle()` is therefore not bypassed by direct field
+assignment. The actual risk of `access(all) var phase` is narrower: any
+reference holder (including through a plain `borrow`) can read the current
+phase, which may enable front-running or predictable-state observations in
+adversarial contexts.
+
+The stronger fix — `access(self) var phase` with an explicit view getter — is
+still the right recommendation for encapsulation discipline, uniform
+enforcement, and future-proofing. Cadence 1.0 enforces this at compile time
+(`fields with 'all' access cannot be directly assigned to`); the recommendation
+is about discipline and clarity, not a runtime threat.
 
 ```cadence
 // ✅ RIGHT: phase is privately stored, only entitled methods mutate it
@@ -231,8 +238,8 @@ access(all) resource Order {
 ```
 
 The same applies to `access(contract)` and `access(account)` on `var phase` —
-both still expose the implicit setter to a wider audience than you usually
-want. Default to `access(self) var` for state fields, and read them through
+both still expose the field to a wider audience than you usually want.
+Default to `access(self) var` for state fields, and read them through
 `access(all) view fun get…()`.
 
 ## Anti-pattern: branching inside a closure or callback
