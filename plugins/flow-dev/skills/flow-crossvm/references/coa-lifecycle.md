@@ -225,7 +225,7 @@ access(all) contract IntentEscrowCrossVM {
         access(all) let depositor: Address
         access(all) let recipient: Address
         access(all) let deadline: UFix64
-        access(all) var phase: Phase
+        access(self) var phase: Phase
 
         // Capability to the depositor's COA — NOT the resource itself.
         // EVM.Call + EVM.Withdraw is the minimum: pay an EVM contract on
@@ -252,6 +252,8 @@ access(all) contract IntentEscrowCrossVM {
             self.depositorCOA = depositorCOA
             self.depositorCOAControllerID = controllerID
         }
+
+        access(all) view fun getPhase(): Phase { return self.phase }
 
         access(all) fun arm() {
             pre { self.phase == Phase.Funding: "wrong phase" }
@@ -335,7 +337,7 @@ transaction(controllerID: UInt64) {
         let escrow = signer.storage.borrow<&IntentEscrowCrossVM.Escrow>(
             from: /storage/myCrossVmEscrow
         ) ?? panic("no escrow")
-        assert(escrow.phase == IntentEscrowCrossVM.Phase.Closed, message: "not closed")
+        assert(escrow.getPhase() == IntentEscrowCrossVM.Phase.Closed, message: "not closed")
         for c in signer.capabilities.storage.getControllers(forPath: /storage/evm) {
             if c.capabilityID == controllerID { c.delete(); break }
         }
