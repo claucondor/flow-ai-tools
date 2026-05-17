@@ -161,6 +161,109 @@ Test.assertEqual(30 as Int, third.amount)
 
 Project the field of interest out of each event and compare the resulting scalar sequence against the expected values. The per-event downcast is mechanical but unavoidable — Cadence's type system cannot widen `[AnyStruct]` to `[Counter.Transferred]` without the explicit cast.
 
+## Asserting event shape & sequence
+
+The single-event and within-transaction ordering idioms above cover one transaction in isolation. The shape that matters most in practice is slightly larger: a test runs `tx1`, `tx2`, `tx3` in sequence and asserts on the combined event trail — count, order, and per-event field values across the whole flow. `Test.eventsOfType` accumulates events across every transaction the test body has executed (and every test in the file, see the cumulative-semantics section above), so the same matcher composes naturally over multi-transaction flows.
+
+### Walking events across sequential transactions
+
+```cadence
+access(all) fun testDepositArmReleaseEmitsInOrder() {
+    let before = Test.eventsOfType(Type<IntentEscrow.StateChanged>()).length
+
+    Test.expect(Test.executeTransaction(depositTx), Test.beSucceeded())
+    Test.expect(Test.executeTransaction(armTx), Test.beSucceeded())
+    Test.expect(Test.executeTransaction(releaseTx), Test.beSucceeded())
+
+    let events = Test.eventsOfType(Type<IntentEscrow.StateChanged>())
+    Test.assertEqual(before + 3, events.length)
+
+    let first = events[before] as! IntentEscrow.StateChanged
+    let second = events[before + 1] as! IntentEscrow.StateChanged
+    let third = events[before + 2] as! IntentEscrow.StateChanged
+    Test.assertEqual("Funding", first.newState)
+    Test.assertEqual("Active", second.newState)
+    Test.assertEqual("Claimable", third.newState)
+}
+```
+
+The baseline-delta pattern from earlier in this file generalises directly: snapshot the count before, run the transactions, index from the baseline. The events arrive in emission order across the three transactions because `eventsOfType` preserves insertion order globally, not per-transaction. This makes multi-tx assertions read like a script of the flow rather than three independent micro-assertions.
+
+When the test sits inside a file that uses `Test.reset(to: setupHeight)` in `beforeEach`, `before` is the count of events emitted during `setup()` — usually zero for contract-defined events, but capture it rather than hard-coding `0` so the test survives a future setup change that emits one.
+
+### Count is part of the assertion, not "at least one"
+
+A transaction that should emit one `StateChanged` event but emits three is a contract bug — the extra emissions corrupt every downstream indexer that joins on the event count. Test for the exact number:
+
+```cadence
+let events = Test.eventsOfType(Type<IntentEscrow.StateChanged>())
+Test.assertEqual(before + 1, events.length)         // ✅ exact
+```
+
+```cadence
+Test.expect(events.length > before, Test.beTrue()) // ❌ "at least one"
+```
+
+The relaxed form passes when the contract over-emits, which defeats the purpose of asserting on the event in the first place. Use `Test.haveElementCount` or an explicit `assertEqual` on the delta; reserve inequality checks for the rare assertion that genuinely cannot bound the count (a fan-out where the size is data-dependent and already verified by a separate state read).
+
+### Failure-path: no event survives a reverted transaction
+
+When a transaction panics, Cadence rolls back every state change *and* every `emit` from inside that transaction's call graph. The test should verify the rollback by asserting the event count is unchanged after the failure:
+
+```cadence
+access(all) fun testReleaseFromWrongPartyEmitsNothing() {
+    let before = Test.eventsOfType(Type<IntentEscrow.StateChanged>()).length
+
+    let result = Test.executeTransaction(releaseTxFromImpostor)
+    Test.expect(result, Test.beFailed())
+
+    let after = Test.eventsOfType(Type<IntentEscrow.StateChanged>()).length
+    Test.assertEqual(before, after)
+}
+```
+
+Pair `Test.beFailed()` with the unchanged-count assertion. The pair documents the full contract of the failure path: the transaction reverted *and* no observable side effect leaked out. Omitting the count check leaves a class of bugs uncovered — a contract that emits an event before panicking would still be observable to an indexer scanning the partial transaction trace in some pipelines, and asserting on event count is the cheapest way to pin the invariant.
+
+This composes with the per-type snapshot pattern: snapshot every event type the failing transaction would emit on its happy path, then assert each one is unchanged after the failed call. The discipline matches what the [event taxonomy](../../cadence-lang/references/event-taxonomy.md) prescribes — every state transition has a dedicated event, and the failure path emits none of them.
+
+### Cross-link: align test assertions with the event taxonomy
+
+The naming and field conventions a test asserts against should match the [event taxonomy](../../cadence-lang/references/event-taxonomy.md) the contract is designed to. In particular:
+
+- Past-tense `<Subject><Verb>` event names mean test assertions read naturally as past-tense facts (`Test.assertEqual("Claimable", evt.newState)`).
+- Before+after pairs on admin events (see [Required Default Events](../../cadence-lang/references/event-taxonomy.md#required-default-events)) let admin-rotation tests assert both the old and new value in one event check rather than threading two events.
+- Narrow verbs (`Granted` / `Revoked` rather than `RoleChanged`) let `eventsOfType` filter the stream the test cares about without a runtime branch on a payload field.
+
+When a contract's events diverge from the taxonomy, the tests usually surface the friction first: an assertion that has to inspect a `kind` discriminator field instead of selecting on a type is a signal the event should have been split into two.
+
+### Anti-patterns
+
+❌ **Matching events as serialised JSON strings.**
+
+```cadence
+let json = events[0].toString()                       // brittle stringification
+Test.assert(json.contains("newState: \"Claimable\""))
+```
+
+The string form depends on Cadence's struct-printing format, which is not part of the contract's public API and can change between framework versions. Field order, quoting of `Address` values, and `UFix64` decimal padding have all shifted between releases. Use a typed downcast instead and assert on the field directly:
+
+```cadence
+let evt = events[0] as! IntentEscrow.StateChanged    // ✅ typed
+Test.assertEqual("Claimable", evt.newState)
+```
+
+The cast gives you compile-time field names, type-correct comparisons (`Address == Address`, not `String == String`), and a clear failure message when a field is missing or renamed.
+
+❌ **Assuming events from a panicking handler will be observable.**
+
+```cadence
+// Inside the contract:
+emit StateChanged(newState: "Active")                 // ← these never escape
+panic("invalid release condition")
+```
+
+Cadence rolls back **every** event from a transaction that reverts. A test that expects to see an event "emitted just before the panic" will find an empty stream — and so will every indexer in production. If the contract genuinely needs to record a failed attempt as a durable event, the failure path must complete normally and the contract logic must branch on the outcome rather than `panic`. Scheduled-transaction handlers are the most common place this trips developers up because the optimistic `Executed` flip happens *outside* the handler's transaction — see the scheduler reference for the failure-mode contract there.
+
 ## Reading Logs
 
 ```cadence
