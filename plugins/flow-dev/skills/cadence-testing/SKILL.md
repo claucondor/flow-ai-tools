@@ -2,7 +2,7 @@
 name: cadence-testing
 description: |
   Guide for writing, running, and debugging unit tests for Cadence smart contracts using the built-in Cadence Testing Framework and `flow test`. Covers test file structure (_test.cdc, setup/beforeEach/tearDown), assertions and matchers, blockchain emulation (accounts, deployments, events, time manipulation), coverage reports, CI integration, and testing patterns.
-  TRIGGER when: writing Cadence unit tests, debugging failing tests, using Test.assert / Test.expect / Test.assertEqual / Test.expectFailure, matchers (Test.equal, Test.beGreaterThan, etc.), Test.createAccount / Test.deployContract / Test.executeTransaction / Test.executeScript in tests, Test.moveTime, Test.eventsOfType in tests, Test.reset, `flow test`, `flow test --cover`, coverage reports, `_test.cdc`, "how do I test this contract", "test is flaky", "mock a capability in a test", testing scheduled transactions, "test FlowTransactionScheduler", "fire callback in test", "advance time for scheduled callback".
+  TRIGGER when: writing Cadence unit tests, debugging failing tests, using Test.assert / Test.expect / Test.assertEqual / Test.expectFailure, matchers (Test.equal, Test.beGreaterThan, etc.), Test.createAccount / Test.deployContract / Test.executeTransaction / Test.executeScript in tests, Test.moveTime, Test.eventsOfType in tests, Test.reset, `flow test`, `flow test --cover`, coverage reports, `_test.cdc`, "how do I test this contract", "test is flaky", "mock a capability in a test", testing scheduled transactions, "test FlowTransactionScheduler", "fire callback in test", "advance time for scheduled callback", "test multi-tx state machine", "test escrow walk-through", "test phase transitions", "test race condition".
   DO NOT TRIGGER when: writing contract or transaction code itself (use cadence-lang), generating new contracts/transactions from scratch (use cadence-scaffold), auditing non-test code for security (use cadence-audit), running flow CLI commands other than `flow test` (use flow-cli), setting up flow.json contract aliases outside a testing context (use flow-project-setup).
 ---
 
@@ -29,6 +29,7 @@ Write and run unit tests for Cadence smart contracts using the built-in `Test` c
 | Testing FT/NFT-dependent contracts: dep order, createEmptyVault, common errors | [ft-and-nft-testing.md](references/ft-and-nft-testing.md) |
 | Testing patterns, isolation, flakiness prevention, anti-patterns | [patterns.md](references/patterns.md) |
 | Time mocking for scheduled transactions (`moveTime` fires callbacks, fee accounting, cancellation, multi-tick) | [scheduled-tx-time-mocking.md](references/scheduled-tx-time-mocking.md) |
+| Multi-tx state machine testing (walk-the-graph, mid-flight revert, races, snapshot isolation) | [multi-tx-state-testing.md](references/multi-tx-state-testing.md) |
 
 ## Running Tests — Quick Reference
 

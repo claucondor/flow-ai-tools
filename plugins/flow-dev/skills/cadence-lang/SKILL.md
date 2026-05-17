@@ -2,7 +2,7 @@
 name: cadence-lang
 description: |
   Comprehensive guide for writing correct, secure, and idiomatic Cadence smart contract code on the Flow blockchain. Covers language fundamentals (resources, contracts, transactions, interfaces, accounts, references, imports), access control and entitlements, capabilities, pre/post conditions, security best practices, anti-patterns to avoid, and proven design patterns.
-  TRIGGER when: writing or debugging Cadence code, asking about Cadence syntax, access(self), access(all), entitlements, resources, move operator (<-), capabilities, references, pre/post conditions, storage paths, "how do I write cadence", "cadence error", "compile error in .cdc", "what does access(self) mean", "how do resources work", "capability-based security", randomness, revertibleRandom, RandomBeaconHistory, RandomConsumer, Xorshift128plus, commit-reveal, "random number in cadence", "how to generate random in flow", scheduled transactions, FlowTransactionScheduler, TransactionHandler interface, callback resource, "schedule a callback", "on-chain automation", "Forte upgrade".
+  TRIGGER when: writing or debugging Cadence code, asking about Cadence syntax, access(self), access(all), entitlements, resources, move operator (<-), capabilities, references, pre/post conditions, storage paths, "how do I write cadence", "cadence error", "compile error in .cdc", "what does access(self) mean", "how do resources work", "capability-based security", randomness, revertibleRandom, RandomBeaconHistory, RandomConsumer, Xorshift128plus, commit-reveal, "random number in cadence", "how to generate random in flow", scheduled transactions, FlowTransactionScheduler, TransactionHandler interface, callback resource, "schedule a callback", "on-chain automation", "Forte upgrade", resource state machines, phase enum, multi-tx escrow, custody, "hold funds across transactions", "intent escrow", "async settlement", Fix128, UFix128, "128-bit fixed point", "fixed-point precision", "UFix64 vs UFix128", "high-precision math Cadence", "AMM math precision".
   DO NOT TRIGGER when: building NFT/FT token contracts (use cadence-tokens), setting up flow.json or FCL (use flow-project-setup), reviewing existing code for vulnerabilities (use cadence-audit), generating new contracts from scratch (use cadence-scaffold).
 ---
 
@@ -42,6 +42,9 @@ Read the relevant reference file based on your task:
 | CU cost by operation, optimization patterns, MAX_SAFE_N methodology | [cu-optimization.md](references/cu-optimization.md) |
 | Randomness APIs (revertibleRandom, beacon, RandomConsumer, commit-reveal) | [randomness.md](references/randomness.md) |
 | Scheduled transactions (`FlowTransactionScheduler`, callback resource, fees, failure handling) | [scheduled-transactions.md](references/scheduled-transactions.md) |
+| Resource state machines (phase enum, entitled transitions, pre/post guards) | [resource-state-machines.md](references/resource-state-machines.md) |
+| Multi-tx escrow / custody (fund-holding resources, recovery paths, two-phase commit) | [multi-tx-escrow.md](references/multi-tx-escrow.md) |
+| 128-bit fixed-point types (`Fix128`/`UFix128`, precision, overflow, conversions) | [numeric-fixed-point.md](references/numeric-fixed-point.md) |
 
 For security-sensitive tasks, also read `security-best-practices.md` and `anti-patterns.md`.
 
