@@ -215,6 +215,38 @@ let now = r.returnValue! as! UFix64
 
 This silently corrupts time-based assertions if you trust the direct call. Always go through `Test.executeScript` for current-block reads.
 
+### The setup-then-reset trap
+
+A common derivative of this gotcha is capturing `setupHeight` after deploying contracts and creating COAs in `setup()`, then using `Test.reset(to: setupHeight)` in `beforeEach()` to roll the chain back between tests:
+
+```cadence
+// ❌ BROKEN — setupHeight captures the height BEFORE setup ran, not after
+access(all) fun setup() {
+    // ... deploy contracts, create COAs, mint tokens ...
+    setupHeight = getCurrentBlock().height  // STALE — same as test-start height
+}
+
+access(all) fun beforeEach() {
+    Test.reset(to: setupHeight)  // rewinds PAST the deploys, wipes contracts + accounts
+}
+```
+
+The next test sees no contracts, no COA, and panics with `account public key not found` or `Could not borrow ...`. The fix is to read the height via a script after every setup mutation that should persist:
+
+```cadence
+// ✅ Correct — fresh read after setup completes
+access(all) fun setup() {
+    // ... deploy contracts, create COAs, mint tokens ...
+    let r = Test.executeScript(
+        "access(all) fun main(): UInt64 { return getCurrentBlock().height }",
+        []
+    )
+    setupHeight = r.returnValue! as! UInt64  // reflects post-setup state
+}
+```
+
+This bug bites EVM-side state especially hard: `Test.reset(to: H)` does roll back deployed EVM contracts and COA EVM balances along with Cadence state, so a misplaced `setupHeight` wipes both VMs in one call and the failure mode is cryptic (cross-VM tests fail with "insufficient EVM balance" or "EVM contract not found" rather than something pointing at the reset itself).
+
 ## Mocking via Contract Substitution
 
 Cadence has no traditional mocking framework — no monkey-patching, no interface stubbing, no method spies. The idiomatic substitute is to deploy a simplified test-only contract under the same import name as the production contract and let the framework's import resolution do the rest.
