@@ -165,6 +165,9 @@ Note also that `executeNextTransaction` returns the result for the popped transa
 ## State Reset (Snapshot Isolation)
 
 ```cadence
+import Test
+import BlockchainHelpers
+
 access(all) var setupHeight: UInt64 = 0
 
 access(all) fun setup() {
@@ -174,7 +177,9 @@ access(all) fun setup() {
         arguments: []
     )
     Test.expect(err, Test.beNil())
-    setupHeight = getCurrentBlock().height
+    // getCurrentBlock().height is stale inside the test runner —
+    // use BlockchainHelpers.getCurrentBlockHeight() for a fresh read.
+    setupHeight = getCurrentBlockHeight()
 }
 
 access(all) fun beforeEach() {
@@ -187,6 +192,45 @@ access(all) fun beforeEach() {
 Without a reset, state from one test leaks into the next. A test that mutates a counter to 5 and runs before a test that asserts the counter starts at 0 silently makes both tests meaningless.
 
 The snapshot-per-test pattern composes well with `Test.expectFailure` and revert tests: even a test that intentionally fails halfway through cannot leave state behind to confuse the next test, because the next `beforeEach` rolls everything back. That isolation is what lets a single test file cover many independent scenarios without a combinatorial explosion of fixtures.
+
+## Built-in Helpers — BlockchainHelpers
+
+The `BlockchainHelpers` module is a built-in Cadence library that ships with the Flow CLI's test runner. It exists specifically because `getCurrentBlock()` called directly inside a test function body returns a **stale value** that never advances after `Test.executeTransaction`, `Test.commitBlock`, or `Test.moveTime` — a known limitation acknowledged in `onflow/cadence-tools#446`, `#480`, and `#264` (all open as of 2026). `BlockchainHelpers` works around this by reading block state through `Test.executeScript`, which always queries the most recent committed block. Import it alongside `Test` at the top of any test file that needs fresh block height or FLOW balance readings.
+
+```cadence
+import Test
+import BlockchainHelpers
+```
+
+No path or address is required. `BlockchainHelpers` is resolved by the test runner as a built-in identifier location (`I.BlockchainHelpers`), the same way `Test` itself is resolved.
+
+### Helper Catalog
+
+| Function | Signature | What it does |
+|---|---|---|
+| `getCurrentBlockHeight` | `(): UInt64` | Executes an internal script that calls `getCurrentBlock().height` against the current committed block. Returns a fresh value — advances after every `commitBlock()` or `executeTransaction()`. |
+| `getFlowBalance` | `(account: Test.TestAccount): UFix64` | Executes a script that borrows the account's `FlowToken.Vault` balance capability. Returns the FLOW balance in the canonical `UFix64` representation. |
+| `mintFlow` | `(to receiver: Test.TestAccount, amount: UFix64): Test.TransactionResult` | Executes the `mint_flow.cdc` transaction signed by the service account, depositing `amount` FLOW tokens into `receiver`'s vault. Returns the `TransactionResult` for further assertion. |
+| `burnFlow` | `(from account: Test.TestAccount, amount: UFix64): Test.TransactionResult` | Executes the `burn_flow.cdc` transaction signed by `account`, withdrawing and destroying `amount` FLOW. Returns the `TransactionResult`. |
+| `executeScript` | `(_ path: String, _ arguments: [AnyStruct]): Test.ScriptResult` | Reads the script at `path` (relative to the test file) and calls `Test.executeScript`. Convenience wrapper that avoids the `Test.readFile` / `Test.executeScript` two-liner everywhere. |
+| `executeTransaction` | `(_ path: String, _ arguments: [AnyStruct], _ account: Test.TestAccount): Test.TransactionResult` | Reads the transaction at `path`, wraps it in `Test.Transaction` with `account` as the single authorizer and signer, and calls `Test.executeTransaction`. |
+
+All six functions are `access(all)`. There is no `getCurrentBlockTimestamp` helper — timestamp still requires either an inline `Test.executeScript` workaround or a call to the internal script directly.
+
+### Empirical verification on Flow CLI v2.17.1
+
+Verification run on 2026-05-17 (Flow CLI v2.17.1): all five callable helpers return fresh values across `commitBlock` / `executeTransaction` boundaries. The most telling reading is the divergence at the same point in a test:
+
+```
+LOG: "Before commitBlock — helper: 42 direct: 40"
+LOG: "After commitBlock  — helper: 43 direct: 40"
+```
+
+`getCurrentBlockHeight()` advances from `42` to `43` after `Test.commitBlock()`; `getCurrentBlock().height` stays frozen at `40`. The staleness gap is cumulative across the file's lifetime — the longer the file runs, the wider the gap.
+
+### Upstream issue cross-reference
+
+The `getCurrentBlock()` staleness is tracked in `onflow/cadence-tools` issues [#446](https://github.com/onflow/cadence-tools/issues/446), [#480](https://github.com/onflow/cadence-tools/issues/480), and [#264](https://github.com/onflow/cadence-tools/issues/264) — all open as of 2026. `BlockchainHelpers` is the **official in-tree workaround** for this limitation. The module lives at `cadence-tools/test/helpers/blockchain_helpers.cdc` and is embedded into the test runner binary at compile time. It is used extensively in `flow-nft`, `flow-ft`, `flow-core-contracts`, and `flow-evm-bridge`, and is the pattern recommended in `onflow/flow-core-contracts/AGENTS.md`. It is **not documented** on `cadence-lang.org` or `developers.flow.com` as of 2026-05 — the official testing docs make no mention of it.
 
 ## Time Manipulation
 
@@ -203,9 +247,15 @@ Test.commitBlock()
 
 `Fix64` accepts negative values, so `Test.moveTime(by: -3600.0)` rewinds the clock by an hour. That can be useful for testing a contract's behaviour around boundary conditions, but it can also surprise contracts that assume time only moves forward — use it with care, and only for the specific assertion that needs it.
 
-**Critical gotcha:** `getCurrentBlock().timestamp` and `getCurrentBlock().height` called DIRECTLY inside test functions return STALE values, even after `Test.moveTime` or `Test.commitBlock`. To read current time/height correctly inside a test, execute a script:
+**Critical gotcha:** `getCurrentBlock().timestamp` and `getCurrentBlock().height` called DIRECTLY inside test functions return STALE values, even after `Test.moveTime` or `Test.commitBlock`. **Use `BlockchainHelpers.getCurrentBlockHeight()` for height** (see § Built-in Helpers above); for timestamp, read via an inline `Test.executeScript`:
 
 ```cadence
+import BlockchainHelpers
+
+// ✅ Height: use the helper directly
+let h = getCurrentBlockHeight()
+
+// ✅ Timestamp: no helper exists, route via Test.executeScript
 let r = Test.executeScript(
     "access(all) fun main(): UFix64 { return getCurrentBlock().timestamp }",
     []
@@ -213,7 +263,7 @@ let r = Test.executeScript(
 let now = r.returnValue! as! UFix64
 ```
 
-This silently corrupts time-based assertions if you trust the direct call. Always go through `Test.executeScript` for current-block reads.
+This silently corrupts time-based assertions if you trust the direct `getCurrentBlock()` call. Always go through `BlockchainHelpers` (height) or `Test.executeScript` (timestamp) for current-block reads.
 
 ### The setup-then-reset trap
 
@@ -231,10 +281,22 @@ access(all) fun beforeEach() {
 }
 ```
 
-The next test sees no contracts, no COA, and panics with `account public key not found` or `Could not borrow ...`. The fix is to read the height via a script after every setup mutation that should persist:
+The next test sees no contracts, no COA, and panics with `account public key not found` or `Could not borrow ...`. The first-choice fix is `BlockchainHelpers.getCurrentBlockHeight()`:
 
 ```cadence
-// ✅ Correct — fresh read after setup completes
+// ✅ First choice — BlockchainHelpers helper (see § Built-in Helpers)
+import BlockchainHelpers
+
+access(all) fun setup() {
+    // ... deploy contracts, create COAs, mint tokens ...
+    setupHeight = getCurrentBlockHeight()  // fresh post-setup height
+}
+```
+
+The inline-script form below also works and is the fallback when `BlockchainHelpers` is not available for any reason:
+
+```cadence
+// ✅ Fallback — inline Test.executeScript (equivalent to what the helper does internally)
 access(all) fun setup() {
     // ... deploy contracts, create COAs, mint tokens ...
     let r = Test.executeScript(
@@ -278,3 +340,4 @@ Mocks live alongside tests, not alongside production code — a conventional loc
 - **Mixing file-level and per-test accounts carelessly.** A file-level `access(all) let admin = Test.createAccount()` is created once when the test file loads, before any `setup()` runs. That is usually fine, but any storage the admin has is wiped the first time `Test.reset(to:)` rolls the chain back to a height earlier than the account's creation — make sure accounts you want to persist are created before the height you later reset to.
 - **Relative paths that point at the wrong directory.** `Test.readFile` and `Test.deployContract` resolve paths relative to the test file itself, not the `flow test` invocation directory. Running the same tests from `cadence/tests/` and from the project root produces identical results — but a path written with the project root in mind breaks as soon as a test file moves into a subfolder.
 - **Forgetting that `executeTransaction` already commits a block.** A test that calls `executeTransaction` and then immediately calls `commitBlock` ends up with an extra empty block at the end, which usually does no harm but can throw off assertions that count blocks. Reach for the queued API only when the explicit block-boundary control is the point.
+- **Reading block height or timestamp with `getCurrentBlock()` directly.** Inside any test function (including `setup()` and `beforeEach()`), `getCurrentBlock().height` and `.timestamp` are frozen at the value the runtime cached when the test file started. They never update after `executeTransaction`, `commitBlock`, or `moveTime`. Use `getCurrentBlockHeight()` from `BlockchainHelpers` (see § Built-in Helpers) for height, and read timestamp via an inline `Test.executeScript` because no `getCurrentBlockTimestamp` helper exists. See upstream issue `onflow/cadence-tools#446`.
