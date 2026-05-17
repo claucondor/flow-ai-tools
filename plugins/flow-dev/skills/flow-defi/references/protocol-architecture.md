@@ -89,21 +89,36 @@ let result = coa.call(
 
 ## On-Chain Automation (FlowTransactionScheduler)
 
-`FlowTransactionScheduler` is a native protocol mechanism for scheduling recurring Cadence transactions without off-chain keeper infrastructure.
+Native protocol scheduling via the `FlowTransactionScheduler` contract removes
+the need for off-chain keepers. Shipped with the Forte network upgrade
+(October 22, 2025).
 
-### Key Properties
-- Transactions execute automatically at specified intervals or block heights
-- No external trigger required (unlike Keeper networks on EVM)
-- Fees deducted from the scheduling account's balance
+### DeFi use cases where scheduled txs pay for themselves
 
-### Use Cases for DeFi
-- Automated rebalancing (AutoBalancer pattern)
-- Interest accrual updates (lending protocols)
-- Epoch transitions (staking/vesting contracts)
-- Reward distribution (no cron bots)
+- **Automated rebalancing** — AutoBalancer pattern reacts to time, not state changes.
+- **Interest accrual** — lending protocols can amortise the cost of compounding
+  across many positions without keeper networks.
+- **Epoch transitions** — staking / vesting contracts that gate by time instead
+  of by a triggering tx.
+- **Reward distribution** — no cron bots; the protocol pays itself to pay users.
 
-### Deployment
-`FlowTransactionScheduler` shipped as part of the Forte network upgrade (October 22, 2025) and is deployed to the service account on mainnet, testnet, and emulator. Scheduling is done via Cadence transactions to that contract. The `flow schedule` CLI command group (`flow schedule setup`, `flow schedule list`, `flow schedule get`, `flow schedule cancel`) wraps these Cadence transactions as a convenience.
+### When to choose scheduled tx vs alternatives
+
+- **Trigger is time** → scheduled tx.
+- **Trigger is on-chain state change** → event hook in the state-changing tx,
+  not a scheduled tx.
+- **Trigger is external (oracle, off-chain API)** → off-chain keeper or oracle
+  push.
+
+For the full API (scheduling, callback resource interface, priority/fees,
+cancellation, per-tick CU ceiling, failure handling), see
+[`cadence-lang/references/scheduled-transactions.md`](../../cadence-lang/references/scheduled-transactions.md).
+For testing scheduled tx in the Cadence Test framework, see
+[`cadence-testing/references/scheduled-tx-time-mocking.md`](../../cadence-testing/references/scheduled-tx-time-mocking.md).
+For the `flow schedule` CLI, see
+[`flow-cli/references/scheduled-transactions.md`](../../flow-cli/references/scheduled-transactions.md).
+For audit patterns specific to scheduled tx, see
+[`cadence-audit/references/forte-anti-patterns.md`](../../cadence-audit/references/forte-anti-patterns.md).
 
 ---
 
