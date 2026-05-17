@@ -2,7 +2,7 @@
 name: cadence-audit
 description: |
   Comprehensive audit and review skill for Cadence smart contracts on the Flow blockchain. Identifies security vulnerabilities, bugs, code quality issues, and optimization opportunities. Produces severity-rated findings (Critical/High/Medium/Low) with actionable fixes.
-  TRIGGER when: auditing, reviewing, or improving Cadence code, checking for security issues, performing code review on .cdc files, looking for anti-patterns or vulnerabilities, optimizing smart contract code, "review cadence", "audit cadence", "check cadence security", "validate cadence contract", "review my .cdc file", "security review", "code review", "find vulnerabilities", "check this contract", "is this code secure", "audit my project".
+  TRIGGER when: auditing, reviewing, or improving Cadence code, checking for security issues, performing code review on .cdc files, looking for anti-patterns or vulnerabilities, optimizing smart contract code, "review cadence", "audit cadence", "check cadence security", "validate cadence contract", "review my .cdc file", "security review", "code review", "find vulnerabilities", "check this contract", "is this code secure", "audit my project", "audit CrossVM code", "CrossVM anti-patterns", "EVM.call audit", "COA capability audit", "result.status check".
   DO NOT TRIGGER when: writing new contracts from scratch (use cadence-scaffold), asking about Cadence syntax or patterns (use cadence-lang), building token contracts (use cadence-tokens).
 ---
 
@@ -44,6 +44,7 @@ When auditing a full project:
 |-----------|---------|
 | [audit-checklist.md](references/audit-checklist.md) | Full security, bugs, quality, DeFi, optimization checklists |
 | [review-format.md](references/review-format.md) | Structured output format, severity levels, verdict criteria |
+| [crossvm-anti-patterns.md](references/crossvm-anti-patterns.md) | CrossVM-specific anti-patterns (10 patterns, severity-rated, with 24-item audit checklist): ignoring result.status, sharing COA auth caps, atomicity assumptions, calldata validation, re-entrancy via EVM callback |
 
 ## Companion Skills
 
