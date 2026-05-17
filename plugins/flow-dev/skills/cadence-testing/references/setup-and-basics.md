@@ -41,9 +41,24 @@ Every contract that a test imports needs a `testing` alias under the contract's 
 }
 ```
 
-The testing framework reserves the address range `0x0000000000000005` through `0x000000000000000E` for user contract aliases. Assign each contract a unique address in that range — collisions cause deployment conflicts in the test environment.
+The testing framework reserves the address range `0x0000000000000001` through `0x0000000000000004` for system contracts:
 
-Standard library contracts such as `FungibleToken`, `NonFungibleToken`, `MetadataViews`, and `ViewResolver` get implicit testing aliases. You do not need to add them to `flow.json` aliases to import them from a test file — the framework deploys the standard contracts into the test blockchain automatically when they are imported.
+| Address | System contract |
+|---|---|
+| `0x0000000000000001` | Service account (and `NonFungibleToken`, `MetadataViews`, `ViewResolver` in onflow/flow-ft's testing config) |
+| `0x0000000000000002` | `FungibleToken` (when bootstrapped by the chain layer) |
+| `0x0000000000000003` | `FlowToken` |
+| `0x0000000000000004` | `FlowFees` |
+
+User contracts use `0x0000000000000005` through `0x000000000000000E`. Collisions in that user range cause deployment conflicts.
+
+**Two categories of contracts in `flow test`:**
+
+1. **Dependency contracts** (`Burner`, `FungibleToken`, `NonFungibleToken`, `MetadataViews`, `ViewResolver`, `FungibleTokenMetadataViews`) declared in `flow.json` `dependencies` with a `testing` alias — these AUTO-LOAD when imported. Do NOT manually `Test.deployContract` them. Calling deployContract on a dep that has a testing alias produces `account with address 0000000000000XXX not found` because the framework already provisioned that address.
+
+2. **Project contracts** (your TestToken, TipJar, etc.) declared in `flow.json` `contracts` — these do NOT auto-deploy. You always need `Test.deployContract(name, path, arguments)` for each project contract in setup(), in dependency order.
+
+If you see `error: cannot find declaration FungibleToken in <path>`, it means the dependency is missing a `testing` alias in `flow.json` — add it, do not try to deploy the contract manually.
 
 If a contract your project depends on was installed via `flow dependencies install`, its generated `flow.json` entry typically already includes network aliases (`emulator`, `testnet`, `mainnet`) but not `testing`. Add the `testing` alias manually the first time you import the dependency from a test.
 
@@ -84,11 +99,13 @@ A test file can define up to five lifecycle functions. All are optional, but a f
 
 - `setup()` — runs once before any test in the file. Typical work: create accounts, deploy contracts under test.
 - `beforeEach()` — runs before every `testXxx` function. Typical work: reset mutable state established in `setup()`, or re-seed a clean fixture.
-- `afterEach()` — runs after every `testXxx` function. Typical work: teardown or invariant checks.
+- `afterEach()` — runs after each test function (between `testFn` and the next `beforeEach`). Use for per-test cleanup. Confirmed present in framework alongside `beforeEach`.
 - `testXxx()` — a test case. The name must begin with `test`. Takes no parameters and returns no value. Each `testXxx` is reported independently.
 - `tearDown()` — runs once after all tests in the file have finished. Typical work: final cleanup.
 
 Lifecycle functions run in the order shown: `setup` → (`beforeEach` → `testXxx` → `afterEach`)* → `tearDown`. Errors in `setup` or `beforeEach` prevent the associated tests from running but are not themselves reported as test failures unless you assert on them explicitly.
+
+**Test execution order:** Tests run in **declaration order** within a file (NOT alphabetical). The hooks run as: `setup → (beforeEach → testN → afterEach)* → tearDown`. Naming conventions like `test_01_*`, `test_02_*` are unnecessary — the framework respects the order you write them.
 
 Test functions are discovered by name. Any top-level `access(all) fun` whose name begins with `test` is treated as a test case — `testDepositIncreasesBalance` is a test, `verifyDeposit` is not. Helper functions can be named anything else and called from tests; they are simply not invoked by the framework on their own.
 
@@ -171,6 +188,81 @@ The value returned by `Test.createAccount()` has type `Test.TestAccount`. Use th
 
 `TestAccount` exposes the `address`, `publicKey`, and other fields needed to construct transactions and scripts during a test run.
 
+## FT-Dependent Contract Setup
+
+A contract that imports `FungibleToken` (or any other token standard) needs the dependency interfaces declared with `testing` aliases — they auto-load — and any project-level concrete contracts deployed before the contract under test.
+
+`flow.json` excerpt (dependencies block — these will auto-load):
+
+```json
+{
+  "dependencies": {
+    "Burner": {
+      "source": "mainnet://f233dcee88fe0abe.Burner",
+      "aliases": { "testing": "0000000000000007" }
+    },
+    "FungibleToken": {
+      "source": "mainnet://f233dcee88fe0abe.FungibleToken",
+      "aliases": { "testing": "0000000000000007" }
+    },
+    "FungibleTokenMetadataViews": {
+      "source": "mainnet://f233dcee88fe0abe.FungibleTokenMetadataViews",
+      "aliases": { "testing": "0000000000000007" }
+    }
+  },
+  "contracts": {
+    "TestToken": {
+      "source": "./cadence/contracts/TestToken.cdc",
+      "aliases": { "testing": "0000000000000007" }
+    },
+    "TipJar": {
+      "source": "./cadence/contracts/TipJar.cdc",
+      "aliases": { "testing": "0000000000000007" }
+    }
+  }
+}
+```
+
+The testing framework allows many contracts on a single account, and using one address keeps `import "TestToken"` from a contract at `0x07` resolving to the right place.
+
+`cadence/tests/TipJar_test.cdc`:
+
+```cadence
+import Test
+import "FungibleToken"
+import "TestToken"
+import "TipJar"
+
+access(all) let admin = Test.getAccount(0x0000000000000007)
+
+access(all) fun setup() {
+    // Burner, FungibleToken, FungibleTokenMetadataViews auto-load via the testing
+    // alias on their `dependencies` entries — DO NOT call Test.deployContract on them.
+
+    // Project contracts deploy explicitly, in dependency order.
+
+    // 1. TestToken — concrete FT used as the contract-under-test's currency.
+    var err = Test.deployContract(
+        name: "TestToken",
+        path: "../contracts/TestToken.cdc",
+        arguments: []
+    )
+    Test.expect(err, Test.beNil())
+
+    // 2. TipJar — the contract under test.
+    err = Test.deployContract(
+        name: "TipJar",
+        path: "../contracts/TipJar.cdc",
+        arguments: []
+    )
+    Test.expect(err, Test.beNil())
+}
+```
+
+The deployment order for project contracts matches the dependency graph. If any deployment fails, `Test.expect(err, Test.beNil())` surfaces the underlying compile error immediately instead of producing a "contract not found" cascade later.
+
+When the contract under test references `TestToken` directly (e.g. `TestToken.createEmptyVault(vaultType: ...)` in its `init`), the test must deploy `TestToken` *before* the contract under test, even if the test file itself never reads `TestToken` state. Deployment order is determined by what the contracts import, not by what the test asserts on.
+
 ## Running the Example
 
 ```
@@ -199,3 +291,7 @@ Use `flow test --cover` to enable coverage reporting; the framework tracks which
 - Not resetting state between tests — mutations from one test leak into the next. Either use `beforeEach()` to restore state, or call `Test.reset(to: setupHeight)` to rewind to a clean snapshot.
 - Naming a test function something other than `testXxx`. The framework silently skips it. If a "test" never seems to run, check that its name starts with the literal prefix `test`.
 - Mixing up file-level `let` bindings with per-test state. Anything declared `access(all) let` at the top of the file is initialized once when the file is loaded and shared by every test. For per-test scratch state, declare locals inside the `testXxx` function instead.
+- `Test.deployContract` takes exactly three labeled arguments: `name`, `path`, `arguments`. There is no `signer:`, `account:`, or `to:` parameter. If you see "too many arguments" on a `deployContract` call, drop the extra parameter — the framework always deploys under its implicit service account.
+- Dependency contracts (`FungibleToken`, `NonFungibleToken`, `MetadataViews`, `ViewResolver`, `Burner`, `FungibleTokenMetadataViews`) AUTO-LOAD when declared with a `testing` alias in `flow.json` `dependencies`. Do NOT call `Test.deployContract` on them — that fails with `account with address 0000000000000XXX not found`. Project contracts (your own `.cdc` files) are the opposite: they MUST be deployed explicitly in `setup()`.
+- A contract interface (e.g. `FungibleToken`) cannot be called as a value from inside another contract: `FungibleToken.createEmptyVault(...)` fails with "cannot find variable in this scope" because the interface has no concrete body. Always call the concrete contract that conforms to the interface (`TestToken.createEmptyVault(...)`, `FlowToken.createEmptyVault(...)`).
+- **Never `Test.reset` to a height before account creation.** Accounts created with `Test.createAccount()` exist as variables, but if you reset to a block height before they were minted, signing transactions with them produces `account public key not found for address 0x... and key index 0`. Either re-create accounts after reset, or only reset to heights AFTER all accounts you'll later sign with were created.

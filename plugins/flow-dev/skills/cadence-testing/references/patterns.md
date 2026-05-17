@@ -182,6 +182,63 @@ Flakiness also hides behind shared file-level state. An `access(all) var` bindin
 
 When a test does occasionally fail, resist the temptation to re-run it until it passes and consider the diagnosis done. A flaky test is a bug report about the suite's assumptions; silencing it with a retry loop hides the bug until it shows up in production. Fix the source of non-determinism and the "flake" goes away permanently.
 
+## Cadence 1.0 Test Anti-Patterns
+
+These specifically arise from misunderstanding Cadence 1.0 semantics inside test files. Each one wasted real time in production agent runs.
+
+- **Calling a contract interface as if it were a contract.** `FungibleToken.createEmptyVault(...)` looks like a static call to a known contract, but `FungibleToken` is a contract *interface* — its methods may have no body, and the symbol is not a runtime value. Use the concrete contract: `TestToken.createEmptyVault(...)`, `FlowToken.createEmptyVault(...)`. The error message ("cannot find variable in this scope") is misleading; the import itself is fine, but the value `FungibleToken` is not callable.
+
+- **Adding a `signer:` parameter to `Test.deployContract`.** The signature is `(name: String, path: String, arguments: [AnyStruct]): Error?` — no fourth labeled parameter exists, no matter how convenient one would be. The framework always deploys under its internal service account. If you need different signers for transactions later, that's `Test.Transaction(..., signers: [...])`, not `deployContract`.
+
+- **Calling `Test.deployContract` on a dependency that has a `testing` alias.** Dependency contracts (`FungibleToken`, `NonFungibleToken`, `MetadataViews`, `ViewResolver`, `Burner`, `FungibleTokenMetadataViews`) declared in `flow.json` `dependencies` with a `testing` alias AUTO-LOAD when imported. Calling `Test.deployContract` on them anyway fails with `account with address 0000000000000XXX not found` because the framework already provisioned that address. Only your own project contracts (`contracts` block) need explicit deployment in `setup()`. If you see `cannot find declaration FungibleToken`, the missing piece is a `testing` alias — not a deploy call.
+
+- **Mismatched `createEmptyVault` signatures on a custom FT.** The `FungibleToken` interface requires two `createEmptyVault` declarations on a conforming contract: an instance method on the `Vault` resource (no args, returns `@{FungibleToken.Vault}`), and a contract-level method that takes `vaultType: Type` and returns `@{FungibleToken.Vault}`. Skipping the `vaultType` parameter on the contract-level one fails interface conformance.
+
+- **Using `flow cadence check`.** This subcommand does not exist. The Cadence sub-commands are `flow cadence lint` (static analysis without running) and `flow cadence language-server`. For static verification of a Cadence file, use `flow cadence lint cadence/contracts/MyContract.cdc` — it parses, type-checks, and reports issues without deploying anything.
+
+- **Confusing addresses 0x1–0x4 with the user range.** The testing blockchain reserves `0x01`–`0x04` for system contracts (service account, FungibleToken, FlowToken, FlowFees). Aliasing your contract to `0x02` clobbers FungibleToken's slot. Use `0x05`–`0x0E` for project contracts; multiple contracts on a single user address (e.g. `0x07`) is fine and matches the onflow/flow-ft convention.
+
+## Capability presence checks
+
+**Wrong:** `if account.capabilities.get<&T>(/public/foo) == nil` — this is silently FALSE forever. `capabilities.get` always returns a Capability value (never nil), even if nothing is published at the path.
+
+**Correct:**
+```cadence
+// Option 1: check existence
+if !account.capabilities.exists(/public/foo) {
+    // not published
+}
+
+// Option 2: borrow check
+let cap = account.capabilities.get<&T>(/public/foo)
+if !cap.check() {
+    // either not published, or target doesn't exist
+}
+```
+
+## Idempotent setup transactions
+
+Setup transactions should be re-runnable without errors. Use existence checks before save/publish:
+
+```cadence
+transaction {
+    prepare(signer: auth(SaveValue, BorrowValue, IssueStorageCapabilityController, PublishCapability) &Account) {
+        // Save vault if not already there
+        if signer.storage.borrow<&MyContract.Vault>(from: /storage/myVault) == nil {
+            signer.storage.save(<- MyContract.createEmptyVault(), to: /storage/myVault)
+        }
+
+        // Publish capability if not already published — use exists() not get() == nil
+        if !signer.capabilities.exists(/public/myReceiver) {
+            let cap = signer.capabilities.storage.issue<&MyContract.Vault>(/storage/myVault)
+            signer.capabilities.publish(cap, at: /public/myReceiver)
+        }
+    }
+}
+```
+
+This pattern is required when tests share state (no `Test.reset` between them) — the second test that runs `setupRecipient` will hit the existing state cleanly instead of failing on `path already stores an object`.
+
 ## Anti-Patterns
 
 A handful of patterns look reasonable up close but corrode the suite over time:
