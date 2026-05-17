@@ -24,7 +24,7 @@ Cross-links:
 ## Four ingredients
 
 1. **A `Strategy` resource interface.** Every approved strategy conforms;
-   declares the entitled `execute` entry point and a `view` `describe()`.
+   declares the entitled `run` entry point and a `view` `describe()`.
 2. **A registry resource** with `access(self) var strategies: {UInt64: Entry}`
    keyed by an internal strategy ID. Each `Entry` stores the capability, the
    provider address, the typed interface name, and the lifecycle phase.
@@ -39,7 +39,7 @@ Cross-links:
 A user submits an `Intent` ("swap 100 FLOW for at least 95 USDC"). The
 registry holds capabilities to vetted strategies — `NoOpStrategy` (sanity /
 testing), `SwapStrategy` (calls a DEX), and so on. An executor borrows the
-registry, picks a strategy by ID, and calls `strategy.execute(intent: ...)`.
+registry, picks a strategy by ID, and calls `strategy.run(intent: ...)`.
 
 ```cadence
 import "FungibleToken"
@@ -47,7 +47,7 @@ import "FungibleToken"
 access(all) contract StrategyRegistry {
 
     access(all) entitlement Admin       // add / revoke / freeze
-    access(all) entitlement Execute     // call execute() on a Strategy ref
+    access(all) entitlement Execute     // call run() on a Strategy ref
 
     access(all) enum Phase: UInt8 {
         access(all) case Active        // executor may call
@@ -58,7 +58,7 @@ access(all) contract StrategyRegistry {
 
     access(all) resource interface Strategy {
         access(all) view fun describe(): String
-        access(Execute) fun execute(intent: &Intent): @{FungibleToken.Vault}
+        access(Execute) fun run(intent: &Intent): @{FungibleToken.Vault}
     }
 
     access(all) struct Intent {
@@ -169,12 +169,12 @@ access(all) contract StrategyRegistry {
 
         // The single source of truth for "is this callable" is Entry.phase.
         // Do NOT re-derive callability from events.
-        access(all) fun execute(id: UInt64, intent: &Intent, caller: Address): @{FungibleToken.Vault} {
+        access(all) fun run(id: UInt64, intent: &Intent, caller: Address): @{FungibleToken.Vault} {
             let e = self.strategies[id] ?? panic("strategy \(id) not registered")
             assert(e.phase == Phase.Active,
                 message: "strategy \(id) not Active (phase=\(e.phase.rawValue))")
             let ref = e.cap.borrow() ?? panic("strategy \(id) capability no longer borrowable")
-            let out <- ref.execute(intent: intent)
+            let out <- ref.run(intent: intent)
             let amount = out.balance
             emit StrategyExecuted(id: id, provider: e.provider, caller: caller, output: amount)
             return <-out
@@ -208,7 +208,7 @@ import "StrategyRegistry"
 access(all) contract NoOpStrategy {
     access(all) resource Impl: StrategyRegistry.Strategy {
         access(all) view fun describe(): String { return "noop" }
-        access(StrategyRegistry.Execute) fun execute(
+        access(StrategyRegistry.Execute) fun run(
             intent: &StrategyRegistry.Intent
         ): @{FungibleToken.Vault} {
             return <- FlowToken.createEmptyVault(vaultType: Type<@FlowToken.Vault>())
@@ -224,7 +224,7 @@ access(all) contract NoOpStrategy {
 access(all) contract SwapStrategy {
     access(all) resource Impl: StrategyRegistry.Strategy {
         access(all) view fun describe(): String { return "FLOW->USDC via DEX X" }
-        access(StrategyRegistry.Execute) fun execute(
+        access(StrategyRegistry.Execute) fun run(
             intent: &StrategyRegistry.Intent
         ): @{FungibleToken.Vault} {
             // Production: borrow router cap, swap intent.inputAmount,
@@ -276,7 +276,7 @@ transaction(strategyID: UInt64, inputAmount: UFix64, minOutput: UFix64) {
         let reg = getAccount(0xCAFE).capabilities
             .borrow<&StrategyRegistry.Registry>(StrategyRegistry.RegistryPublicPath)
             ?? panic("registry not reachable")
-        let out <- reg.execute(id: strategyID, intent: &intent, caller: user.address)
+        let out <- reg.run(id: strategyID, intent: &intent, caller: user.address)
         let receiver = user.capabilities
             .borrow<&{FungibleToken.Receiver}>(/public/flowTokenReceiver)
             ?? panic("no receiver")
@@ -299,7 +299,7 @@ stored target does not actually conform to `{Strategy}` — the type slot is
 satisfied syntactically because Cadence does not enforce target conformance on
 the capability *value* until you `borrow()` it. A registry that never
 `check()`s at add-time will only discover the mismatch the first time someone
-calls `execute(id:)`, which is exactly the wrong place to fail. Pair this with
+calls `run(id:)`, which is exactly the wrong place to fail. Pair this with
 storing `interfaceName` so off-chain auditors can compare the declared
 interface against what was actually whitelisted.
 
@@ -333,7 +333,7 @@ voting.
 access(all) resource RegistryBad {
     access(self) var strategies: {UInt64: Address}
     access(Admin) fun addStrategy(addr: Address): UInt64 { /* just stores addr */ }
-    access(all) fun execute(id: UInt64) {
+    access(all) fun run(id: UInt64) {
         let addr = self.strategies[id]!
         // Hope /public/strategy exists, hope it conforms, hope the entitlement
         // is set up. Three hopes, zero checks.
@@ -415,10 +415,10 @@ source is `Entry.phase`, read via `getEntry(id:).phase` in a script. See
   `SwapStrategy` from a `LendingStrategy` when both implement `{Strategy}`.
 - **Reusing strategy IDs after revocation.** New strategies get fresh IDs
   from `nextID`. Re-using a revoked ID breaks event-history reasoning.
-- **Calling `execute` against a `Deprecated` strategy.** The `assert` in
-  `execute()` must require `Phase.Active` — not "phase != Revoked". A
+- **Calling `run` against a `Deprecated` strategy.** The `assert` in
+  `run()` must require `Phase.Active` — not "phase != Revoked". A
   deprecated strategy is *intentionally* uncallable; route to a newer one.
-- **Strategy doesn't double-check the intent.** `Strategy.execute` should
+- **Strategy doesn't double-check the intent.** `Strategy.run` should
   also `pre`-check `intent.outputType == Type<@OutputVault>()` inside the
   strategy. Defense in depth — the registry is not the only type guard.
 - **Skipping events on idempotent revoke.** Emit even if the entry is already
