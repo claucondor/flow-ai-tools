@@ -272,9 +272,9 @@ access(all) contract StrategyRegistry {
         self.strategies[name] = ref     // freezes the reference
     }
 
-    access(all) fun execute(name: String, amount: UFix64) {
+    access(all) fun run(name: String, amount: UFix64) {
         let strategy = self.strategies[name] ?? panic("not found")
-        strategy.execute(amount: amount)    // reference may be stale
+        strategy.run(amount: amount)    // reference may be stale
     }
 }
 ```
@@ -295,10 +295,10 @@ access(all) contract StrategyRegistry {
         pre { cap.check(): "capability does not resolve" }
         self.strategies[name] = cap
     }
-    access(all) fun execute(name: String, amount: UFix64) {
+    access(all) fun run(name: String, amount: UFix64) {
         let cap = self.strategies[name] ?? panic("not found")
         let strategy = cap.borrow() ?? panic("strategy no longer resolves")
-        strategy.execute(amount: amount)
+        strategy.run(amount: amount)
     }
 }
 ```
@@ -322,10 +322,10 @@ access(all) contract StrategyRegistry {
     access(self) let strategies: {String: Capability<&{StrategyInterface}>}
 
     // BAD — no per-block / per-tx / per-user limits
-    access(all) fun execute(name: String, amount: UFix64) {
+    access(all) fun run(name: String, amount: UFix64) {
         let cap = self.strategies[name] ?? panic("not found")
         let strategy = cap.borrow() ?? panic("borrow failed")
-        strategy.execute(amount: amount)
+        strategy.run(amount: amount)
     }
 }
 ```
@@ -351,7 +351,7 @@ access(all) contract StrategyRegistry {
 
     access(Admin) fun setCaps(name: String, caps: UsageCaps) { self.caps[name] = caps }
 
-    access(all) fun execute(name: String, user: Address, amount: UFix64) {
+    access(all) fun run(name: String, user: Address, amount: UFix64) {
         let cap = self.caps[name] ?? panic("uncapped strategy refused")
         assert(amount <= cap.perTx, message: "perTx cap exceeded")
         let height = getCurrentBlock().height
@@ -415,14 +415,14 @@ access(all) contract StrategyRegistry {
         let probe = cap.borrow() ?? panic("borrow")
         self.strategies[name] = Entry(cap: cap, kind: probe.kind)
     }
-    access(all) fun execute(name: String, amount: UFix64) {
+    access(all) fun run(name: String, amount: UFix64) {
         let entry = self.strategies[name] ?? panic("not found")
         let strategy = entry.cap.borrow() ?? panic("borrow")
         if strategy.kind != entry.approvedKind {
             emit StrategyKindMismatch(name: name, approved: entry.approvedKind, observed: strategy.kind)
             panic("strategy code identifier changed since approval; re-approve required")
         }
-        strategy.execute(amount: amount)
+        strategy.run(amount: amount)
     }
 }
 ```
