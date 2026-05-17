@@ -47,21 +47,22 @@ One plugin is registered in `.claude-plugin/marketplace.json`:
 
 - **flow-dev** (`plugins/flow-dev/`) — v1.0.0, category `blockchain`
 
-It contains exactly these eleven skills (each has its own `SKILL.md` plus a `references/` directory):
+It contains exactly these twelve skills (each has its own `SKILL.md` plus a `references/` directory):
 
 | Skill | Reference count |
 |---|---|
 | `cadence-lang` | 14 |
 | `cadence-tokens` | 3 |
-| `cadence-audit` | 2 |
+| `cadence-audit` | 3 |
 | `cadence-scaffold` | 3 |
-| `cadence-testing` | 6 |
+| `cadence-testing` | 7 |
 | `flow-react-sdk` | 4 |
 | `flow-project-setup` | 2 |
 | `flow-cli` | 5 |
 | `flow-dev-setup` | 8 |
 | `flow-defi` | 4 |
 | `flow-tokenomics` | 5 |
+| `flow-crossvm` | 7 |
 
 Descriptions and trigger phrases live in each `SKILL.md` frontmatter.
 
@@ -82,6 +83,11 @@ When a developer asks for help, use this table to determine which skill(s) to ac
 | Design token economics for a Flow protocol | `flow-tokenomics` | `flow-defi`, `cadence-tokens` |
 | Write unit tests for Cadence contracts | `cadence-testing` | `cadence-lang` |
 | Debug failing Cadence tests / add coverage | `cadence-testing` | `cadence-lang`, `cadence-audit` |
+| Call an EVM contract from a Cadence transaction (COA, `coa.call`, ABI encoding) | `flow-crossvm` | `cadence-lang`, `cadence-audit` |
+| Read ERC20 balances or storage from a Cadence script | `flow-crossvm` | `cadence-lang` |
+| Bridge native FLOW between Cadence and EVM, or hold EVM assets under Cadence custody | `flow-crossvm` | `cadence-lang`, `flow-defi` |
+| Write cross-VM integration tests (Cadence + EVM together) | `cadence-testing` | `flow-crossvm`, `cadence-lang` |
+| Audit CrossVM code for capability, atomicity, or CU-ceiling pitfalls | `cadence-audit` | `flow-crossvm`, `cadence-lang` |
 
 ## Install and Validate Commands
 
