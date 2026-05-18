@@ -47,7 +47,7 @@ One plugin is registered in `.claude-plugin/marketplace.json`:
 
 - **flow-dev** (`plugins/flow-dev/`) — v1.0.0, category `blockchain`
 
-It contains exactly these twelve skills (each has its own `SKILL.md` plus a `references/` directory):
+It contains exactly these thirteen skills (each has its own `SKILL.md` plus a `references/` directory):
 
 | Skill | Reference count |
 |---|---|
@@ -63,6 +63,7 @@ It contains exactly these twelve skills (each has its own `SKILL.md` plus a `ref
 | `flow-defi` | 4 |
 | `flow-tokenomics` | 5 |
 | `flow-crossvm` | 7 |
+| `flow-actions` | 6 |
 
 Descriptions and trigger phrases live in each `SKILL.md` frontmatter.
 
@@ -81,6 +82,9 @@ When a developer asks for help, use this table to determine which skill(s) to ac
 | Install dev tools (Flow CLI, emulator, VS Code, EVM tooling) | `flow-dev-setup` | `flow-project-setup` |
 | Design or architect a DeFi protocol on Flow | `flow-defi` | |
 | Design token economics for a Flow protocol | `flow-tokenomics` | `flow-defi`, `cadence-tokens` |
+| Compose Source / Swapper / Sink / PriceOracle into atomic DeFi transactions | `flow-actions` | `cadence-lang`, `flow-defi` |
+| Build a scheduled DeFi executor (DCA, auto-rebalancer, recurring strategy) | `flow-actions` | `cadence-lang`, `cadence-audit` |
+| Implement a custom Source / Sink / Swapper / PriceOracle connector for a protocol | `flow-actions` | `cadence-lang`, `cadence-scaffold` |
 | Write unit tests for Cadence contracts | `cadence-testing` | `cadence-lang` |
 | Debug failing Cadence tests / add coverage | `cadence-testing` | `cadence-lang`, `cadence-audit` |
 | Generate random numbers on Flow (revertibleRandom, commit-reveal, VRF) | `cadence-lang` | `cadence-audit`, `cadence-scaffold`, `flow-react-sdk` |

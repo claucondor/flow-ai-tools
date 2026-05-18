@@ -1,5 +1,7 @@
 # Scaffold: DeFi Actions Transaction
 
+> **Want the standalone Source / Sink / Swapper / PriceOracle interfaces uncoupled from IncrementFi?** See [`flow-actions`](../../flow-actions/SKILL.md) — that skill documents the protocol-agnostic interfaces, all 5 composition patterns (including non-IncrementFi worked examples like `FixedRateSwapper`), and scheduled-tx integration (DCA executor template). This `scaffold-defi.md` reference is specifically for IncrementFi-coupled scaffolding; the interface-level patterns live there.
+
 ## Interview the User
 
 Before generating, ask for:
