@@ -2,7 +2,7 @@
 name: cadence-lang
 description: |
   Comprehensive guide for writing correct, secure, and idiomatic Cadence smart contract code on the Flow blockchain. Covers language fundamentals (resources, contracts, transactions, interfaces, accounts, references, imports), access control and entitlements, capabilities, pre/post conditions, security best practices, anti-patterns to avoid, and proven design patterns.
-  TRIGGER when: writing or debugging Cadence code, asking about Cadence syntax, access(self), access(all), entitlements, resources, move operator (<-), capabilities, references, pre/post conditions, storage paths, "how do I write cadence", "cadence error", "compile error in .cdc", "what does access(self) mean", "how do resources work", "capability-based security".
+  TRIGGER when: writing or debugging Cadence code, asking about Cadence syntax, access(self), access(all), entitlements, resources, move operator (<-), capabilities, references, pre/post conditions, storage paths, "how do I write cadence", "cadence error", "compile error in .cdc", "what does access(self) mean", "how do resources work", "capability-based security", "HashAlgorithm import error", "cannot import HashAlgorithm", "SignatureAlgorithm import", "import PublicKey cadence", "built-in types no import", "contract self.account vs signer", "self.account address", "contract caller identity", "who called the contract".
   DO NOT TRIGGER when: building NFT/FT token contracts (use cadence-tokens), setting up flow.json or FCL (use flow-project-setup), reviewing existing code for vulnerabilities (use cadence-audit), generating new contracts from scratch (use cadence-scaffold).
 ---
 
@@ -39,6 +39,8 @@ Read the relevant reference file based on your task:
 | Security best practices | [security-best-practices.md](references/security-best-practices.md) |
 | Anti-patterns to avoid | [anti-patterns.md](references/anti-patterns.md) |
 | Design patterns | [design-patterns.md](references/design-patterns.md) |
+| Built-in types that require no import (HashAlgorithm, SignatureAlgorithm, PublicKey, AccountKey, Block, Type) | [built-in-types.md](references/built-in-types.md) |
+| Contract `self.account` vs transaction signer — explicit caller parameter pattern | [contract-self-vs-signer.md](references/contract-self-vs-signer.md) |
 
 For security-sensitive tasks, also read `security-best-practices.md` and `anti-patterns.md`.
 
