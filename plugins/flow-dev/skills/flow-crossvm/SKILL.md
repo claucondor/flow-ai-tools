@@ -2,7 +2,7 @@
 name: flow-crossvm
 description: |
   Guide for building CrossVM applications on Flow — Cadence transactions and scripts that read from or call into Flow EVM atomically. Covers the Cadence Owned Account (COA) pattern, `EVM.call` / `coa.call` mechanics, ABI encoding and decoding from Cadence, reading ERC20 storage from Cadence scripts, native FLOW bridging between Cadence and EVM, the 9999 CU per-transaction ceiling shared across both VMs, and Solidity test fixtures for integration testing.
-  TRIGGER when: writing CrossVM transactions or scripts, "EVM.call", "coa.call", "coa.borrow", "COA", "Cadence Owned Account", "EVM on Flow", "EVM contract from Cadence", "ERC20 from Cadence", "ERC20 balance Cadence", "call EVM contract", "FLOW bridge Cadence to EVM", "bridge FLOW from Cadence", "EVM gas Flow", "CrossVM", "cross-VM", "ABI encode Cadence", "decode EVM response", "EVM.encodeABI", "EVM.decodeABI", "EVM.dryCall", "9999 CU CrossVM", "CrossVM CU ceiling", "atomic EVM call from Cadence", "escrow via COA", "COA custody", "result.status EVM".
+  TRIGGER when: writing CrossVM transactions or scripts, "EVM.call", "coa.call", "coa.borrow", "COA", "Cadence Owned Account", "EVM on Flow", "EVM contract from Cadence", "ERC20 from Cadence", "ERC20 balance Cadence", "call EVM contract", "FLOW bridge Cadence to EVM", "bridge FLOW from Cadence", "EVM gas Flow", "CrossVM", "cross-VM", "ABI encode Cadence", "decode EVM response", "EVM.encodeABI", "EVM.decodeABI", "EVM.dryCall", "9999 CU CrossVM", "CrossVM CU ceiling", "atomic EVM call from Cadence", "escrow via COA", "COA custody", "result.status EVM", "EVM precompiles", "ECRECOVER", "BN254 pairing", "ecAdd", "ecMul", "ecPairing", "Cadence Arch", "flowBlockHeight precompile", "getRandomSource precompile", "verifyCOAOwnershipProof", "EVM.Call entitlement", "EVM.Deploy", "EVM.Withdraw", "EVM.Owner entitlement", "EVM.Validate", "EVM.Bridge", "COA entitlement hierarchy", "EVM events from Cadence", "EVM.TransactionExecuted", "RLP decode logs", "parse EVM Transfer event".
   DO NOT TRIGGER when: writing Cadence syntax in isolation (use `cadence-lang`), designing DeFi architecture without an EVM bridge component (use `flow-defi`), building React frontend EVM hooks like `useCrossVmBatchTransaction` (use `flow-react-sdk`), auditing existing CrossVM code for vulnerabilities (use `cadence-audit`), generating brand-new CrossVM transactions from scratch (use `cadence-scaffold`).
 ---
 
@@ -46,6 +46,9 @@ Read the relevant reference based on the task:
 | Native FLOW bridge between Cadence and EVM (`coa.deposit` / `coa.withdraw`), atomicity guarantees, fees | [flow-bridge.md](references/flow-bridge.md) |
 | Minimal Solidity test fixtures (ERC20, AMM, oracle stubs) for integration tests against `coa.call` | [solidity-fixtures.md](references/solidity-fixtures.md) |
 | CrossVM empirical explorations: 10 measured CU formulas, 10 named patterns, 7 decision trees, async-intent insights | [explorations.md](references/explorations.md) |
+| EVM precompiles in Flow EVM (0x01-0x11 Ethereum-standard + Cadence Arch at 0x...01: flowBlockHeight, getRandomSource, verifyCOAOwnershipProof) | [evm-precompiles.md](references/evm-precompiles.md) |
+| COA entitlement model deep-dive (Call/Deploy/Withdraw/Validate/Owner/Bridge — flat hierarchy, per-method gating, exact error strings) | [coa-entitlements.md](references/coa-entitlements.md) |
+| Reading EVM events from Cadence (EVM.TransactionExecuted, RLP-encoded logs, ABI decode indexed vs non-indexed parameters) | [evm-events.md](references/evm-events.md) |
 
 For security-sensitive work — especially anything that touches user funds across the VM boundary — pair this skill with `cadence-audit`.
 
