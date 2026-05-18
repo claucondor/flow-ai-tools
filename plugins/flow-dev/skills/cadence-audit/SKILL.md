@@ -2,7 +2,7 @@
 name: cadence-audit
 description: |
   Comprehensive audit and review skill for Cadence smart contracts on the Flow blockchain. Identifies security vulnerabilities, bugs, code quality issues, and optimization opportunities. Produces severity-rated findings (Critical/High/Medium/Low) with actionable fixes.
-  TRIGGER when: auditing, reviewing, or improving Cadence code, checking for security issues, performing code review on .cdc files, looking for anti-patterns or vulnerabilities, optimizing smart contract code, "review cadence", "audit cadence", "check cadence security", "validate cadence contract", "review my .cdc file", "security review", "code review", "find vulnerabilities", "check this contract", "is this code secure", "audit my project", randomness vulnerabilities, abort-on-bad-roll, modulo bias, auditing scheduled transactions, "FlowTransactionScheduler audit", "Forte anti-patterns", "scheduled callback security", "audit strategy registry", "registry anti-patterns", "capability whitelist audit", "executor pattern audit", "audit CrossVM code", "CrossVM anti-patterns", "EVM.call audit", "COA capability audit", "result.status check".
+  TRIGGER when: auditing, reviewing, or improving Cadence code, checking for security issues, performing code review on .cdc files, looking for anti-patterns or vulnerabilities, optimizing smart contract code, "review cadence", "audit cadence", "check cadence security", "validate cadence contract", "review my .cdc file", "security review", "code review", "find vulnerabilities", "check this contract", "is this code secure", "audit my project", randomness vulnerabilities, abort-on-bad-roll, modulo bias, auditing scheduled transactions, "FlowTransactionScheduler audit", "Forte anti-patterns", "scheduled callback security", "audit strategy registry", "registry anti-patterns", "capability whitelist audit", "executor pattern audit", "audit CrossVM code", "CrossVM anti-patterns", "EVM.call audit", "COA capability audit", "result.status check", "audit async intent system", "audit intent executor", "audit DeFi composition", "audit scheduled settlement".
   DO NOT TRIGGER when: writing new contracts from scratch (use cadence-scaffold), asking about Cadence syntax or patterns (use cadence-lang), building token contracts (use cadence-tokens).
 ---
 
@@ -48,6 +48,7 @@ When auditing a full project:
 | [forte-anti-patterns.md](references/forte-anti-patterns.md) | Anti-patterns specific to `FlowTransactionScheduler` (10 patterns, severity-rated, with audit checklist) |
 | [strategy-registry-anti-patterns.md](references/strategy-registry-anti-patterns.md) | Anti-patterns for capability-whitelist registries (9 patterns, severity-rated, with 19-item audit checklist) |
 | [crossvm-anti-patterns.md](references/crossvm-anti-patterns.md) | CrossVM-specific anti-patterns (10 patterns, severity-rated, with 24-item audit checklist): ignoring result.status, sharing COA auth caps, atomicity assumptions, calldata validation, re-entrancy via EVM callback |
+| [async-intent-checklist.md](references/async-intent-checklist.md) | Capstone audit checklist for async intent systems (6 lifecycle phases, 52 questions, severity rubric, cross-links to all per-domain anti-pattern refs) |
 
 ## Companion Skills
 
