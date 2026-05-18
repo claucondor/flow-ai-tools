@@ -30,7 +30,7 @@ Then install individual plugins:
 
 | Plugin | Description | Skills | Category |
 |--------|-------------|--------|----------|
-| **flow-dev** | Flow network development | `cadence-lang`, `cadence-tokens`, `cadence-audit`, `cadence-scaffold`, `cadence-testing`, `flow-react-sdk`, `flow-project-setup`, `flow-cli`, `flow-dev-setup`, `flow-defi`, `flow-tokenomics` | blockchain |
+| **flow-dev** | Flow network development | `cadence-lang`, `cadence-tokens`, `cadence-audit`, `cadence-scaffold`, `cadence-testing`, `flow-react-sdk`, `flow-project-setup`, `flow-cli`, `flow-dev-setup`, `flow-defi`, `flow-tokenomics`, `flow-actions` | blockchain |
 
 ### flow-dev
 
@@ -49,6 +49,7 @@ Skills for developing on the Flow network:
 | `flow-dev-setup` | Development environment setup: Flow CLI installation, emulator, VS Code extension, testing framework, dev wallet, frontend SDKs (FCL/React), EVM tooling (Hardhat/Foundry/Remix) |
 | `flow-defi` | Flow DeFi architecture: COAs, MEV-free EVM, cross-VM atomicity, lending health factor/kink models, AMM type selection, liquidity bootstrapping benchmarks, veFLOW, Merkl, ecosystem map |
 | `flow-tokenomics` | Token economics: Fisher Equation, Nash equilibrium, proven patterns (Real Yield/Buyback/veToken) with failure case studies, TGE 12-week playbook, DAO governance attack vectors, Howey Test, MiCA compliance |
+| `flow-actions` | DeFi Actions framework on Flow: standalone Source / Sink / Swapper / PriceOracle interfaces (protocol-agnostic), 5 composition patterns (Source→Swapper→Sink and variants), atomic DeFi transactions with single uniqueID, and scheduled-tx integration patterns (DCA executor, auto-rebalancer) |
 
 ## Repository Structure
 
@@ -93,6 +94,9 @@ plugins/
             flow-tokenomics/
                 SKILL.md    # Tokenomics guide
                 references/ # 5 reference files
+            flow-actions/
+                SKILL.md    # DeFi Actions framework guide
+                references/ # 6 reference files
 ```
 
 ## Contributing
