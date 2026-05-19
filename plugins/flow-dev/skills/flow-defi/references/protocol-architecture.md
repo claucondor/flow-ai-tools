@@ -140,6 +140,8 @@ access(all) fun getRandomSeed(blockHeight: UInt64): [UInt8] {
 
 > **See also:** `defi-primitives.md` for building blocks (lending models, AMM selection).
 
+> **For local Flow EVM development setup** (emulator, gateway, funding an EVM address from Cadence): see `flow-dev-setup/references/evm-tooling.md`.
+
 ---
 
 ## Cross-VM Failure Modes
