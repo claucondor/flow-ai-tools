@@ -36,6 +36,7 @@ Install and configure the tools needed for Flow blockchain development. Each ref
 | Install FCL or React SDK for frontend integration | [frontend-sdk.md](references/frontend-sdk.md) |
 | Set up Cadence MCP server for AI-assisted development | [cadence-mcp.md](references/cadence-mcp.md) |
 | Set up Hardhat, Foundry, or Remix for Solidity on Flow EVM | [evm-tooling.md](references/evm-tooling.md) |
+| Deploy snarkjs Groth16 verifiers on Flow EVM (EIP-197 pi_b swap, chainId alignment) | [groth16-verifier-deploy.md](references/groth16-verifier-deploy.md) |
 
 ## Typical Setup Order
 

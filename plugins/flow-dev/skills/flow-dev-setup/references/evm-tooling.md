@@ -266,6 +266,10 @@ Get testnet FLOW tokens from the faucet:
 - Web: https://faucet.flow.com/fund-account
 - CLI: `flow accounts fund --network testnet <account>`
 
+## zk-SNARK / Groth16 Verifiers
+
+Deploying snarkjs-generated Groth16 verifiers on Flow EVM is mechanically identical to deploying on Ethereum, with one EIP-197 calldata convention that catches every team the first time. See [groth16-verifier-deploy.md](groth16-verifier-deploy.md) for the proof-encoding swap, chainId alignment, and on-chain testing checklist.
+
 ## Documentation
 
 - EVM on Flow: https://developers.flow.com/build/evm
