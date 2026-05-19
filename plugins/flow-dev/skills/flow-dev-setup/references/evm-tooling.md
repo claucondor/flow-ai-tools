@@ -14,6 +14,107 @@ Flow EVM lets you deploy and interact with Solidity smart contracts on Flow usin
 - Currency symbol: FLOW
 - Token denomination: Atto-FLOW (1 FLOW = 10^18 Atto-FLOW), same as wei in Ethereum
 
+## Local Development with EVM Gateway
+
+### Why two processes are required
+
+`flow emulator` alone does NOT serve EVM JSON-RPC. The emulator exposes only Flow REST, gRPC,
+and admin ports; sending `eth_chainId` to any of those returns a 404 or protocol error. EVM
+JSON-RPC only becomes available after starting `flow evm gateway` as a separate process.
+
+### Process 1: Flow Emulator
+
+```bash
+flow emulator \
+  --rest-port=8880 \
+  --evm-test-helpers \
+  --log-format=text
+```
+
+`--evm-test-helpers` activates convenience EVM debugging endpoints. Moving the emulator REST
+to 8880 (from the default 8888) avoids a port conflict if you later assign the gateway to 8888.
+
+### Process 2: EVM Gateway
+
+```bash
+COA_ADDR="f8d6e0586b0a20c7"   # emulator service account address
+COA_KEY="<service-account-private-key-no-0x-prefix>"
+
+flow evm gateway \
+  --access-node-host localhost:3569 \
+  --flow-network-id emulator \
+  --evm-network-id testnet \
+  --coa-address $COA_ADDR \
+  --coa-key $COA_KEY \
+  --coa-resource-create \
+  --coinbase 0xYOUR_COINBASE_ADDRESS \
+  --database-dir .evm-gateway-db \
+  --gas-price 1 \
+  --rpc-port 3000
+```
+
+### Chain ID truth table
+
+`--evm-network-id` controls the chain ID the gateway reports. The default is `testnet`.
+`emulator` is NOT a valid value for this flag (it is valid for `--flow-network-id`).
+
+| `--evm-network-id` | `eth_chainId` (hex) | Decimal | Network |
+|--------------------|---------------------|---------|---------|
+| `testnet` (default)| `0x221` | **545** | Flow EVM Testnet |
+| `preview` | `0x286` | **646** | Flow Previewnet |
+| `mainnet` | `0x2eb` | **747** | Flow EVM Mainnet |
+| `emulator` | error | — | not supported |
+
+For local development use `testnet` (chain ID 545) or `preview` (chain ID 646). Do not pass
+`emulator` — it is rejected with "EVM network ID not supported".
+
+### Port conflict note
+
+The gateway's default RPC port is **3000**, not 8888. Running both processes with stock
+defaults (emulator REST=8888, gateway RPC=3000) produces no conflict.
+
+The conflict only arises when you explicitly pass `--rpc-port 8888` to the gateway (a common
+choice for Ethereum familiarity). In that case, also pass `--rest-port=8880` to the emulator
+so both can bind.
+
+### Verify the gateway is running
+
+```bash
+curl -X POST -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","method":"eth_chainId","params":[],"id":1}' \
+  http://127.0.0.1:<GATEWAY_PORT>/
+# Expected: {"jsonrpc":"2.0","id":1,"result":"0x221"}  (chain 545 for testnet)
+```
+
+### Hardhat config for local gateway
+
+Point `flowLocal` at whatever port you chose (3000 default, or 8888 if overridden):
+
+```typescript
+flowLocal: {
+  url: 'http://127.0.0.1:3000',   // change to 8888 if you ran --rpc-port 8888
+  accounts: [process.env.DEPLOY_WALLET_1 as string],
+  chainId: 545,
+},
+```
+
+---
+
+## Funding an EVM Address from Cadence
+
+The gateway's `--coinbase` starts at zero FLOW, so your first deploy will fail on gas without
+a funding step. The full transaction (Cadence code, gotchas, arithmetic notes, and verification
+curl) is in [`funding-evm-from-cadence.md`](funding-evm-from-cadence.md).
+
+Quick summary:
+
+- Use `auth(BorrowValue) &Account` — `BorrowValue` alone is sufficient for `.borrow()`.
+- `EVM.Balance(attoflow:)` takes **`UInt`**, NOT `UInt256`.
+- Cast the withdrawn vault: `<-withdrawn as! @FlowToken.Vault` (intersection vs concrete type).
+- `coa.deposit` funds the COA only; follow with `coa.call` to reach an external EVM address.
+
+---
+
 ## Hardhat
 
 ### Prerequisites

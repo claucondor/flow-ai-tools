@@ -122,3 +122,5 @@ access(all) fun getRandomSeed(blockHeight: UInt64): [UInt8] {
 **DeFi applications:** Fair lottery/raffle contracts, randomized NFT drops, prediction market resolution.
 
 > **See also:** `defi-primitives.md` for building blocks (lending models, AMM selection).
+
+> **For local Flow EVM development setup** (emulator, gateway, funding an EVM address from Cadence): see `flow-dev-setup/references/evm-tooling.md`.
