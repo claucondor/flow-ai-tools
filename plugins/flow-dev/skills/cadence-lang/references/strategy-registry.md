@@ -391,6 +391,9 @@ useful guidance. Always model the registry entry as a state machine — see
 
 ## Anti-pattern: events as state
 
+> See canonical treatment in [event-taxonomy.md](event-taxonomy.md) AP5.
+> This entry is a context-specific summary; updates to the underlying behavior should land in the canonical file first.
+
 An off-chain script that replays `StrategyAdded` / `StrategyRevoked` history
 to decide "is strategy 7 still active?" lags on-chain truth and misses
 out-of-order delivery. Events are observability only; the authoritative
