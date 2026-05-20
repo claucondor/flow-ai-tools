@@ -199,12 +199,29 @@ Tests that only cover the happy path miss half the contract's behaviour. Contrac
 
 A Cadence call that panics inside a test file propagates the panic and fails the test with that message. There are two idioms for asserting that a revert happened, and the right choice depends on where the panic originates.
 
-**In-process panics** — use `Test.expectFailure`. The closure runs in the test's own call stack, so a direct call to a helper or a Cadence call that panics is caught by the framework:
+### `Test.expectFailure` is for closures, NOT transaction results
+
+`Test.expectFailure(fn, errorMessageSubstring)` wraps a closure expected to panic.
 
 ```cadence
-Test.expectFailure(fun(): Void {
-    panic("not authorized")
-}, errorMessageSubstring: "not authorized")
+Test.expectFailure(
+    fun() {
+        panic("specific failure message")
+    },
+    errorMessageSubstring: "specific failure"  // substring match
+)
+```
+
+- Empty substring `""` matches any panic.
+- Closure that does NOT panic fails with: `Expected a failure, but found none.`
+- Wrong substring fails with: `Expected error message to include: "..."`
+
+**For transaction failures**, use `Test.beFailed()` matcher instead:
+
+```cadence
+let result = Test.executeTransaction(tx)
+Test.expect(result, Test.beFailed())
+Test.assert(result.error!.message.contains("expected error fragment"))
 ```
 
 **Blockchain panics** — a transaction or script that reverts on the blockchain returns a `TransactionResult` or `ScriptResult` whose `status` is failure; it does not propagate a panic into the test. Inspect the result directly:
@@ -216,13 +233,36 @@ Test.assert(result.error!.message.contains("not authorized"),
     message: "unexpected error: ".concat(result.error!.message))
 ```
 
+### Pre/post condition assertion pattern
+
+Failed pre/post conditions surface in `result.error!.message` with this format:
+
+```
+* transaction execute failed: ... error: pre-condition failed: <your message>
+```
+
+Assert with substring:
+
+```cadence
+Test.expect(result, Test.beFailed())
+Test.assert(result.error!.message.contains("pre-condition failed: amount must be positive"))
+```
+
+### `Test.assertEqual` semantics
+
+- Works on `Int`, `String`, `UFix64`, `Bool`, `Address`, structs, `[T]` arrays, `{K: V}` dictionaries.
+- Struct field order does NOT matter for equality (deep equality on fields).
+- Array order MATTERS (`[1,2,3] != [3,2,1]`).
+- Dictionary key order does NOT matter.
+- Failure message: `assertion failed: not equal: expected: X, actual: Y`.
+
 Match on a stable substring only. Contract error messages often embed addresses, nonces, or resource IDs that change between runs, so a full-string `assertEqual` against an error message is brittle. Picking a short, intention-revealing fragment ("not authorized", "insufficient balance") keeps the test readable and resilient.
 
 If the test body does not care why the call failed — only that it did — stop after `Test.beFailed()` and skip the substring check. Adding a substring check you don't need couples the test to an implementation detail of the contract and creates churn the next time the error message is reworded.
 
 Across all of these idioms, the rule of thumb is the same: assert on the smallest stable thing that still proves the behaviour you care about. A narrow assertion survives refactors; a broad one becomes a maintenance burden within a few sprints.
 
-## Common Mistakes
+## Common Pitfalls
 
 - **Comparing addresses as strings without normalising the `0x` prefix.** `0x01` and `01` are not equal as `String` but refer to the same `Address`. Compare `Address` values as `Address`, not as strings — if you must stringify, strip the `0x` on both sides before the compare. The same caveat applies to event field values read out of `AnyStruct` maps, which the framework returns with the canonical `0x`-prefixed form.
 - **Using `assertEqual` across types that don't implement `Equatable`.** The framework compares with `==`, so non-`Equatable` composite types (structs without an explicit conformance, resources) will not compare usefully. Assert on a scalar projection of the value instead, or write a `Test.newMatcher` that extracts the fields you care about and compares each one explicitly.

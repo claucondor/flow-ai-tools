@@ -27,6 +27,8 @@ access(all) let user = Test.createAccount()
 
 `Test.serviceAccount()` returns the implicit account that owns the protocol contracts and holds the testing framework's privileged keys. Transactions signed by the service account can deploy core contracts or manipulate accounts that user accounts cannot; most tests only need it when setting up fixtures that rely on system-level authority.
 
+**Test framework service account is `0x0000000000000001`.** This differs from the emulator service account (`0xf8d6e0586b0a20c7`). Use `Test.serviceAccount()` to get this account; both `Test.serviceAccount()` and `Test.createAccount()` can sign transactions normally.
+
 Accounts are just keys plus an address — storage and capabilities live on them only after a transaction writes to them. A freshly created account has no fungible token vault, no NFT collection, and no resources at all until your test (or the contract's `init`) puts something there.
 
 A common pattern is to give every persistent role its own file-level account binding (`admin`, `minter`, `user`, `attacker`) and keep one-off accounts as locals inside the test that needs them. The names then read as documentation in the test body — `Test.Transaction(..., signers: [attacker], ...)` is self-explanatory in a way that `signers: [account3]` is not.
@@ -55,9 +57,25 @@ Test.expect(err, Test.beNil())
 
 `Test.deployContract(name:path:arguments:)` returns an optional `Error?`. A `nil` return means the deployment succeeded; a non-`nil` value carries the compile or runtime error. Always assert on the result — a silent deployment failure surfaces later as a confusing "contract not found" error from `executeScript` or `executeTransaction`, and debugging that is far more painful than a clear `Test.beNil` failure at setup.
 
+The full signature is exactly:
+
+```cadence
+fun deployContract(
+    name: String,
+    path: String,
+    arguments: [AnyStruct]
+): Error?
+```
+
+There is no `signer` parameter — the test framework deploys every contract under the implicit service account of the test blockchain. If you see `error: too many arguments`, you almost certainly added a fourth labeled argument (`signer:`, `account:`, `to:`) that does not exist in the API.
+
+The `name` must match the contract's declared name in source. The `path` is relative to the test file. The `arguments` array is `[AnyStruct]` — every entry must be a concrete value typed correctly for the contract's `init` parameters. Pass `[]` for contracts whose `init` takes no arguments.
+
+The deployed contract is registered under the `testing` alias from `flow.json`, which is what makes `import "ContractName"` resolve from inside the test, from any script the test runs, and from any later-deployed contract. If `flow.json` does not have a `testing` alias for the contract, deployment fails with `cannot find declaration <name>` regardless of whether the source path is correct.
+
 The `path` is relative to the test file, not to the project root. The `arguments` array is passed to the contract's `init` in declaration order, typed as `[AnyStruct]`. The deployed contract is registered under the `testing` alias declared in `flow.json`, so it becomes importable by name (`import "Counter"`) from the test file and from any scripts or transactions the test runs.
 
-When a contract under test imports another contract, the dependency must be deployed first. The framework deploys standard library contracts (`FungibleToken`, `NonFungibleToken`, `MetadataViews`, `ViewResolver`) automatically when they are imported, but anything else — including third-party contracts your project depends on — needs an explicit `deployContract` call earlier in `setup()`. Order the deployments by their dependency graph: leaves first, roots last.
+When a contract under test imports another contract, the dependency must be deployed first. The framework auto-loads dependency contracts that have a `testing` alias under the `dependencies` block in `flow.json` (typically `FungibleToken`, `NonFungibleToken`, `MetadataViews`, `ViewResolver`, `Burner`, `FungibleTokenMetadataViews`) — do NOT call `Test.deployContract` on those, it fails with `account with address 0x... not found` because the address is already provisioned. Project contracts under the `contracts` block always need an explicit `deployContract` call in `setup()`. Order the project deployments by their dependency graph: leaves first, roots last.
 
 Cyclic imports are not legal at deployment time — Cadence resolves a contract's imports before its `init` runs, so two contracts that import each other cannot both be deployed in any order. If you find yourself wanting that, the right fix is almost always to extract the shared types or interfaces into a third contract that both import.
 
@@ -100,6 +118,21 @@ A transaction whose `prepare` block declares two parameters needs two entries in
 
 Argument values in the `arguments` array must match the transaction's declared parameter types exactly. Cadence does not coerce between numeric widths, so a transaction expecting a `UInt64` rejects a plain `42` (which the parser infers as `Int`). Cast at the call site — `42 as UInt64` — to keep type errors at the test boundary instead of hidden inside the transaction prelude.
 
+**Capabilities cannot be transaction arguments.** Trying to pass `Capability<&T>` produces `error: argument type is not importable: Capability<&T>`. This is a hard framework constraint (matches mainnet behavior). Capabilities must be looked up INSIDE the transaction body via `getAccount(addr).capabilities.get<...>(/public/...)`, never received as a parameter.
+
+**Hex literals are parsed as Int, not Address.** Passing `[0x0000000000000007]` to `Test.executeScript` or `Test.executeTransaction` fails with `invalid argument at index 0: expected value of type 'Address'`. Always wrap with `Address(...)` or use `account.address`:
+
+```cadence
+// WRONG — parses as Int
+Test.executeScript(script, [0x0000000000000007])
+
+// CORRECT
+Test.executeScript(script, [Address(0x0000000000000007)])
+Test.executeScript(script, [admin.address])  // also fine
+```
+
+**Authorizer/signer length must match exactly.** A `Test.Transaction` with `authorizers: [a.address, b.address], signers: [a]` (mismatched length) crashes the framework with a Go runtime panic and stack trace, NOT a graceful test error. Always validate `signers.length == authorizers.length` before constructing the transaction.
+
 ## Batch Execution
 
 ```cadence
@@ -132,6 +165,9 @@ Note also that `executeNextTransaction` returns the result for the popped transa
 ## State Reset (Snapshot Isolation)
 
 ```cadence
+import Test
+import BlockchainHelpers
+
 access(all) var setupHeight: UInt64 = 0
 
 access(all) fun setup() {
@@ -141,7 +177,9 @@ access(all) fun setup() {
         arguments: []
     )
     Test.expect(err, Test.beNil())
-    setupHeight = getCurrentBlock().height
+    // getCurrentBlock().height is stale inside the test runner —
+    // use BlockchainHelpers.getCurrentBlockHeight() for a fresh read.
+    setupHeight = getCurrentBlockHeight()
 }
 
 access(all) fun beforeEach() {
@@ -154,6 +192,45 @@ access(all) fun beforeEach() {
 Without a reset, state from one test leaks into the next. A test that mutates a counter to 5 and runs before a test that asserts the counter starts at 0 silently makes both tests meaningless.
 
 The snapshot-per-test pattern composes well with `Test.expectFailure` and revert tests: even a test that intentionally fails halfway through cannot leave state behind to confuse the next test, because the next `beforeEach` rolls everything back. That isolation is what lets a single test file cover many independent scenarios without a combinatorial explosion of fixtures.
+
+## Built-in Helpers — BlockchainHelpers
+
+The `BlockchainHelpers` module is a built-in Cadence library that ships with the Flow CLI's test runner. It exists specifically because `getCurrentBlock()` called directly inside a test function body returns a **stale value** that never advances after `Test.executeTransaction`, `Test.commitBlock`, or `Test.moveTime` — a known limitation acknowledged in `onflow/cadence-tools#446`, `#480`, and `#264` (all open as of 2026). `BlockchainHelpers` works around this by reading block state through `Test.executeScript`, which always queries the most recent committed block. Import it alongside `Test` at the top of any test file that needs fresh block height or FLOW balance readings.
+
+```cadence
+import Test
+import BlockchainHelpers
+```
+
+No path or address is required. `BlockchainHelpers` is resolved by the test runner as a built-in identifier location (`I.BlockchainHelpers`), the same way `Test` itself is resolved.
+
+### Helper Catalog
+
+| Function | Signature | What it does |
+|---|---|---|
+| `getCurrentBlockHeight` | `(): UInt64` | Executes an internal script that calls `getCurrentBlock().height` against the current committed block. Returns a fresh value — advances after every `commitBlock()` or `executeTransaction()`. |
+| `getFlowBalance` | `(account: Test.TestAccount): UFix64` | Executes a script that borrows the account's `FlowToken.Vault` balance capability. Returns the FLOW balance in the canonical `UFix64` representation. |
+| `mintFlow` | `(to receiver: Test.TestAccount, amount: UFix64): Test.TransactionResult` | Executes the `mint_flow.cdc` transaction signed by the service account, depositing `amount` FLOW tokens into `receiver`'s vault. Returns the `TransactionResult` for further assertion. |
+| `burnFlow` | `(from account: Test.TestAccount, amount: UFix64): Test.TransactionResult` | Executes the `burn_flow.cdc` transaction signed by `account`, withdrawing and destroying `amount` FLOW. Returns the `TransactionResult`. |
+| `executeScript` | `(_ path: String, _ arguments: [AnyStruct]): Test.ScriptResult` | Reads the script at `path` (relative to the test file) and calls `Test.executeScript`. Convenience wrapper that avoids the `Test.readFile` / `Test.executeScript` two-liner everywhere. |
+| `executeTransaction` | `(_ path: String, _ arguments: [AnyStruct], _ account: Test.TestAccount): Test.TransactionResult` | Reads the transaction at `path`, wraps it in `Test.Transaction` with `account` as the single authorizer and signer, and calls `Test.executeTransaction`. |
+
+All six functions are `access(all)`. There is no `getCurrentBlockTimestamp` helper — timestamp still requires either an inline `Test.executeScript` workaround or a call to the internal script directly.
+
+### Empirical verification on Flow CLI v2.17.1
+
+Verification run on 2026-05-17 (Flow CLI v2.17.1): all five callable helpers return fresh values across `commitBlock` / `executeTransaction` boundaries. The most telling reading is the divergence at the same point in a test:
+
+```
+LOG: "Before commitBlock — helper: 42 direct: 40"
+LOG: "After commitBlock  — helper: 43 direct: 40"
+```
+
+`getCurrentBlockHeight()` advances from `42` to `43` after `Test.commitBlock()`; `getCurrentBlock().height` stays frozen at `40`. The staleness gap is cumulative across the file's lifetime — the longer the file runs, the wider the gap.
+
+### Upstream issue cross-reference
+
+The `getCurrentBlock()` staleness is tracked in `onflow/cadence-tools` issues [#446](https://github.com/onflow/cadence-tools/issues/446), [#480](https://github.com/onflow/cadence-tools/issues/480), and [#264](https://github.com/onflow/cadence-tools/issues/264) — all open as of 2026. `BlockchainHelpers` is the **official in-tree workaround** for this limitation. The module lives at `cadence-tools/test/helpers/blockchain_helpers.cdc` and is embedded into the test runner binary at compile time. It is used extensively in `flow-nft`, `flow-ft`, `flow-core-contracts`, and `flow-evm-bridge`, and is the pattern recommended in `onflow/flow-core-contracts/AGENTS.md`. It is **not documented** on `cadence-lang.org` or `developers.flow.com` as of 2026-05 — the official testing docs make no mention of it.
 
 ## Time Manipulation
 
@@ -169,6 +246,68 @@ Test.commitBlock()
 `moveTime` and `commitBlock` are complementary, not interchangeable. `commitBlock` advances the block height but not the wall clock — it's the right tool when a contract cares about block numbers. `moveTime` advances the wall clock but not the block height — it's the right tool when a contract cares about timestamps. If the contract reads both `getCurrentBlock().height` and `getCurrentBlock().timestamp`, move time and then commit a block, in that order.
 
 `Fix64` accepts negative values, so `Test.moveTime(by: -3600.0)` rewinds the clock by an hour. That can be useful for testing a contract's behaviour around boundary conditions, but it can also surprise contracts that assume time only moves forward — use it with care, and only for the specific assertion that needs it.
+
+**Critical gotcha:** `getCurrentBlock().timestamp` and `getCurrentBlock().height` called DIRECTLY inside test functions return STALE values, even after `Test.moveTime` or `Test.commitBlock`. **Use `BlockchainHelpers.getCurrentBlockHeight()` for height** (see § Built-in Helpers above); for timestamp, read via an inline `Test.executeScript`:
+
+```cadence
+import BlockchainHelpers
+
+// ✅ Height: use the helper directly
+let h = getCurrentBlockHeight()
+
+// ✅ Timestamp: no helper exists, route via Test.executeScript
+let r = Test.executeScript(
+    "access(all) fun main(): UFix64 { return getCurrentBlock().timestamp }",
+    []
+)
+let now = r.returnValue! as! UFix64
+```
+
+This silently corrupts time-based assertions if you trust the direct `getCurrentBlock()` call. Always go through `BlockchainHelpers` (height) or `Test.executeScript` (timestamp) for current-block reads.
+
+### The setup-then-reset trap
+
+A common derivative of this gotcha is capturing `setupHeight` after deploying contracts and creating COAs in `setup()`, then using `Test.reset(to: setupHeight)` in `beforeEach()` to roll the chain back between tests:
+
+```cadence
+// ❌ BROKEN — setupHeight captures the height BEFORE setup ran, not after
+access(all) fun setup() {
+    // ... deploy contracts, create COAs, mint tokens ...
+    setupHeight = getCurrentBlock().height  // STALE — same as test-start height
+}
+
+access(all) fun beforeEach() {
+    Test.reset(to: setupHeight)  // rewinds PAST the deploys, wipes contracts + accounts
+}
+```
+
+The next test sees no contracts, no COA, and panics with `account public key not found` or `Could not borrow ...`. The first-choice fix is `BlockchainHelpers.getCurrentBlockHeight()`:
+
+```cadence
+// ✅ First choice — BlockchainHelpers helper (see § Built-in Helpers)
+import BlockchainHelpers
+
+access(all) fun setup() {
+    // ... deploy contracts, create COAs, mint tokens ...
+    setupHeight = getCurrentBlockHeight()  // fresh post-setup height
+}
+```
+
+The inline-script form below also works and is the fallback when `BlockchainHelpers` is not available for any reason:
+
+```cadence
+// ✅ Fallback — inline Test.executeScript (equivalent to what the helper does internally)
+access(all) fun setup() {
+    // ... deploy contracts, create COAs, mint tokens ...
+    let r = Test.executeScript(
+        "access(all) fun main(): UInt64 { return getCurrentBlock().height }",
+        []
+    )
+    setupHeight = r.returnValue! as! UInt64  // reflects post-setup state
+}
+```
+
+This bug bites EVM-side state especially hard: `Test.reset(to: H)` does roll back deployed EVM contracts and COA EVM balances along with Cadence state, so a misplaced `setupHeight` wipes both VMs in one call and the failure mode is cryptic (cross-VM tests fail with "insufficient EVM balance" or "EVM contract not found" rather than something pointing at the reset itself).
 
 ## Mocking via Contract Substitution
 
@@ -197,7 +336,11 @@ Mocks live alongside tests, not alongside production code — a conventional loc
 
 - **Forgetting to assert `Test.beNil()` on the `deployContract` return.** Silent deploy failures surface later as "contract not found" errors during `executeScript`, which are hard to trace back to the real cause. Every `deployContract` call deserves a matching `Test.expect(err, Test.beNil())` immediately after it.
 - **Reusing the emulator across tests without `reset`.** State from one test bleeds into the next, turning a passing suite into an order-dependent mess. Capture a snapshot height at the end of `setup()` and call `Test.reset(to:)` in `beforeEach()` so every test starts from the same known fixture.
+
+> See canonical treatment in [test-reset-caveats.md](test-reset-caveats.md).
+> This entry is a context-specific summary; updates to the underlying behavior should land in the canonical file first.
 - **Assuming `moveTime` advances block height.** It does not. If the contract reads `getCurrentBlock().height`, call `commitBlock()` after `moveTime` to advance both clocks. Likewise, `commitBlock` on its own does not move the wall clock, so a contract reading `timestamp` will see the same value across many committed blocks unless `moveTime` is used explicitly.
 - **Mixing file-level and per-test accounts carelessly.** A file-level `access(all) let admin = Test.createAccount()` is created once when the test file loads, before any `setup()` runs. That is usually fine, but any storage the admin has is wiped the first time `Test.reset(to:)` rolls the chain back to a height earlier than the account's creation — make sure accounts you want to persist are created before the height you later reset to.
 - **Relative paths that point at the wrong directory.** `Test.readFile` and `Test.deployContract` resolve paths relative to the test file itself, not the `flow test` invocation directory. Running the same tests from `cadence/tests/` and from the project root produces identical results — but a path written with the project root in mind breaks as soon as a test file moves into a subfolder.
 - **Forgetting that `executeTransaction` already commits a block.** A test that calls `executeTransaction` and then immediately calls `commitBlock` ends up with an extra empty block at the end, which usually does no harm but can throw off assertions that count blocks. Reach for the queued API only when the explicit block-boundary control is the point.
+- **Reading block height or timestamp with `getCurrentBlock()` directly.** Inside any test function (including `setup()` and `beforeEach()`), `getCurrentBlock().height` and `.timestamp` are frozen at the value the runtime cached when the test file started. They never update after `executeTransaction`, `commitBlock`, or `moveTime`. Use `getCurrentBlockHeight()` from `BlockchainHelpers` (see § Built-in Helpers) for height, and read timestamp via an inline `Test.executeScript` because no `getCurrentBlockTimestamp` helper exists. See upstream issue `onflow/cadence-tools#446`.
