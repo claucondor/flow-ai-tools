@@ -2,7 +2,7 @@
 name: flow-cli
 description: |
   Complete reference for the Flow CLI — the command-line tool for developing, testing, and deploying on the Flow blockchain. Covers project initialization, account management, contract deployment, transaction sending, script execution, dependency management, key generation, scheduled transactions, and emulator usage.
-  TRIGGER when: using the Flow CLI, running flow commands, "flow accounts get", "flow accounts create", "flow init", "flow project deploy", "flow scripts execute", "flow transactions send", "flow test", "flow emulator", "flow keys generate", "flow dependencies install", "flow accounts fund", "deploy contract to testnet", "how to create a Flow account", "check account balance on Flow", "run cadence script", "send a transaction", "flow accounts add-contract", "flow accounts staking-info".
+  TRIGGER when: using the Flow CLI, running flow commands, "flow accounts get", "flow accounts create", "flow init", "flow project deploy", "flow scripts execute", "flow transactions send", "flow test", "flow emulator", "flow keys generate", "flow dependencies install", "flow accounts fund", "deploy contract to testnet", "how to create a Flow account", "check account balance on Flow", "run cadence script", "send a transaction", "flow accounts add-contract", "flow accounts staking-info", "flow schedule setup", "flow schedule list", "flow schedule get", "flow schedule cancel", "manual tick emulator", "scheduled transaction CLI", "schedule setup broken", "Could not borrow Manager".
   DO NOT TRIGGER when: writing Cadence contract code (use cadence-lang), building React frontends (use flow-react-sdk), auditing code (use cadence-audit).
 ---
 
@@ -28,6 +28,8 @@ flow test                # Run tests
 | Project commands: init, generate, deploy, test, deps, config | [project.md](references/project.md) |
 | Query blockchain: accounts, blocks, events, transactions, scripts | [query-blockchain.md](references/query-blockchain.md) |
 | Ready-to-use Cadence script recipes (balance, staking, NFT, EVM) | [cadence-scripts.md](references/cadence-scripts.md) |
+| `flow schedule` commands, deploy/inspect/manual tick, v2.17.1 setup bug workaround | [scheduled-transactions.md](references/scheduled-transactions.md) |
+| Confirmed Flow CLI defects (v2.17.1 setup bug, workarounds) | [known-bugs.md](references/known-bugs.md) |
 
 ## Key Principles
 

@@ -209,7 +209,7 @@ let withVariance = blended + (seed % 5) - 2  // ±2 variance
 
 ---
 
-## Common Mistakes
+## Common Pitfalls
 
 ### ❌ Forgetting to destroy the old value in insert
 ```cadence
