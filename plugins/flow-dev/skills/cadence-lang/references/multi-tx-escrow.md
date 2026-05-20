@@ -299,6 +299,9 @@ uniqueness), enumeration via `keys`, and a single storage path to back up.
 
 ### Anti-pattern 2: treating events as state
 
+> See canonical treatment in [event-taxonomy.md](event-taxonomy.md) AP5.
+> This entry is a context-specific summary; updates to the underlying behavior should land in the canonical file first.
+
 ```cadence
 // ❌ DO NOT trust event history for control flow.
 // "If we ever emitted Claimed for this id, treat it as settled."

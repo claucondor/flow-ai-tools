@@ -90,7 +90,8 @@ access(all) contract SecureContract {
 
 ## Anti-Pattern 5: State Modification in Public Struct Initializers
 
-**Problem**: Anyone can create structs, so initializers that modify contract state allow state corruption.
+<!-- stale: re-verify on next Flow CLI major -->
+Historical (patched in Cadence v1.8.9 — included for migration awareness): **Problem**: Anyone can create structs, so initializers that modify contract state allow state corruption.
 
 ```cadence
 // ❌ CRITICAL: State modification in struct init

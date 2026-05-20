@@ -349,6 +349,9 @@ transaction(controllerID: UInt64) {
 
 ### Anti-pattern 1: publishing an auth capability at `/public/evm`
 
+> See canonical treatment in [coa-entitlements.md](coa-entitlements.md) Anti-pattern C.
+> This entry is a context-specific summary; updates to the underlying behavior should land in the canonical file first.
+
 ```cadence
 // CRITICAL — anyone can drain the COA.
 let cap = signer.capabilities.storage
@@ -377,6 +380,9 @@ If a third party needs to call EVM contracts on your behalf, hand them a
 single, named recipient address — not via `/public/*`.
 
 ### Anti-pattern 2: sharing one `auth(EVM.Call)` cap with multiple consumers
+
+> See canonical treatment in [coa-entitlements.md](coa-entitlements.md) Anti-pattern B.
+> This entry is a context-specific summary; updates to the underlying behavior should land in the canonical file first.
 
 Capabilities are **not view-only proofs of ownership**. Anyone holding an
 `auth(EVM.Call) &EVM.CadenceOwnedAccount` can call any EVM contract through

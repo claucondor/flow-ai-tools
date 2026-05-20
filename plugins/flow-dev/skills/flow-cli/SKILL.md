@@ -29,6 +29,7 @@ flow test                # Run tests
 | Query blockchain: accounts, blocks, events, transactions, scripts | [query-blockchain.md](references/query-blockchain.md) |
 | Ready-to-use Cadence script recipes (balance, staking, NFT, EVM) | [cadence-scripts.md](references/cadence-scripts.md) |
 | `flow schedule` commands, deploy/inspect/manual tick, v2.17.1 setup bug workaround | [scheduled-transactions.md](references/scheduled-transactions.md) |
+| Confirmed Flow CLI defects (v2.17.1 setup bug, workarounds) | [known-bugs.md](references/known-bugs.md) |
 
 ## Key Principles
 

@@ -283,7 +283,7 @@ A failing assertion shows the matcher's rendered message, so descriptive matcher
 
 Use `flow test --cover` to enable coverage reporting; the framework tracks which lines of your contracts executed during tests and prints a percentage per contract. Coverage is off by default because it slows test runs — turn it on in CI and leave it off during the tight local edit-test loop.
 
-## Common Setup Pitfalls
+## Common Pitfalls
 
 - Forgetting the `testing` alias in `flow.json`. The test fails at import resolution with a message like "cannot find contract" before any lifecycle function runs. Add the contract to `aliases.testing` with an address in the `0x5`–`0xE` range.
 - Paths passed to `Test.readFile` and `Test.deployContract` are relative to the test file itself, not to the project root. From `cadence/tests/Counter_test.cdc`, the contract lives at `../contracts/Counter.cdc`. Running `flow test` from a different working directory does not change this.
@@ -295,3 +295,6 @@ Use `flow test --cover` to enable coverage reporting; the framework tracks which
 - Dependency contracts (`FungibleToken`, `NonFungibleToken`, `MetadataViews`, `ViewResolver`, `Burner`, `FungibleTokenMetadataViews`) AUTO-LOAD when declared with a `testing` alias in `flow.json` `dependencies`. Do NOT call `Test.deployContract` on them — that fails with `account with address 0000000000000XXX not found`. Project contracts (your own `.cdc` files) are the opposite: they MUST be deployed explicitly in `setup()`.
 - A contract interface (e.g. `FungibleToken`) cannot be called as a value from inside another contract: `FungibleToken.createEmptyVault(...)` fails with "cannot find variable in this scope" because the interface has no concrete body. Always call the concrete contract that conforms to the interface (`TestToken.createEmptyVault(...)`, `FlowToken.createEmptyVault(...)`).
 - **Never `Test.reset` to a height before account creation.** Accounts created with `Test.createAccount()` exist as variables, but if you reset to a block height before they were minted, signing transactions with them produces `account public key not found for address 0x... and key index 0`. Either re-create accounts after reset, or only reset to heights AFTER all accounts you'll later sign with were created.
+
+> See canonical treatment in [test-reset-caveats.md](test-reset-caveats.md).
+> This entry is a context-specific summary; updates to the underlying behavior should land in the canonical file first.

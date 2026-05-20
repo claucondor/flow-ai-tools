@@ -156,7 +156,7 @@ access(all) fun setup() {
 
 Pull standard sources to disk with `flow dependencies install` so they live under `imports/<addr>/<Name>.cdc` and can be referenced from `flow.json` by source path.
 
-## Common Errors and Fixes
+## Common Pitfalls
 
 | Error | Root cause | Fix |
 |---|---|---|

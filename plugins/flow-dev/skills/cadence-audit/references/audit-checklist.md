@@ -144,6 +144,10 @@
 - Fix: send a zero-approval call immediately after a successful EVM redemption completes.
 
 ### EVM Call Result Not Validated
+
+> See canonical treatment in [../flow-crossvm/references/evm-call.md](../flow-crossvm/references/evm-call.md) Pitfall 1.
+> This entry is a context-specific summary; updates to the underlying behavior should land in the canonical file first.
+
 - Every `coa.call()` and `EVM.dryCall()` returns `EVM.Result`. Is `result.status == EVM.Status.successful` checked before trusting `result.data`?
 - Unchecked EVM failure = silent state divergence between Cadence and EVM.
 
@@ -175,7 +179,7 @@
 - Any mint/inflate exploit can exit via the bridge faster than governance can react.
 
 ### Contract Initializer Argument Type Smuggling
-- Dec 27, 2025: `account.contracts.add()` accepted arguments where calling context treated them as value types but initializer treated them as resources → resources copied instead of moved → infinite mint. Patched in Cadence v1.8.9.
+- Historical (patched in Cadence v1.8.9 — included for migration awareness): Dec 27, 2025: `account.contracts.add()` accepted arguments where calling context treated them as value types but initializer treated them as resources → resources copied instead of moved → infinite mint. Patched in Cadence v1.8.9.
 - Audit: any deployment/upgrade transaction that passes attachments, `PublicKey` wrappers, or nested composites as initializer arguments. Verify static type == dynamic type for all complex arguments.
 
 ### Use-After-Free via Retained Reference After Resource Destroy

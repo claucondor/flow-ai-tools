@@ -467,6 +467,9 @@ transaction hash. The CLI `--help`'s `0x1234...` example is misleading.
 - **Calling `panic` in the handler for ordinary "skip this tick" logic.** That
   costs the full fee and leaves no `Executed` event. Use early `return`
   instead, and reserve `panic` for unrecoverable invariant violations.
+
+> See canonical treatment in [../cadence-audit/references/forte-anti-patterns.md](../cadence-audit/references/forte-anti-patterns.md) A6.
+> This entry is a context-specific summary; updates to the underlying behavior should land in the canonical file first.
 - **Assuming retries.** The scheduler never retries. Re-schedule from within
   the handler if you want recurrence.
 - **Trying to cancel during `executeTransaction`.** The post-execution entry

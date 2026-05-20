@@ -262,7 +262,7 @@ If the test body does not care why the call failed — only that it did — stop
 
 Across all of these idioms, the rule of thumb is the same: assert on the smallest stable thing that still proves the behaviour you care about. A narrow assertion survives refactors; a broad one becomes a maintenance burden within a few sprints.
 
-## Common Mistakes
+## Common Pitfalls
 
 - **Comparing addresses as strings without normalising the `0x` prefix.** `0x01` and `01` are not equal as `String` but refer to the same `Address`. Compare `Address` values as `Address`, not as strings — if you must stringify, strip the `0x` on both sides before the compare. The same caveat applies to event field values read out of `AnyStruct` maps, which the framework returns with the canonical `0x`-prefixed form.
 - **Using `assertEqual` across types that don't implement `Equatable`.** The framework compares with `==`, so non-`Equatable` composite types (structs without an explicit conformance, resources) will not compare usefully. Assert on a scalar projection of the value instead, or write a `Test.newMatcher` that extracts the fields you care about and compares each one explicitly.

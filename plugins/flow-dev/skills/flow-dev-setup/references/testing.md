@@ -125,7 +125,7 @@ You can also use a pragma in test files:
 #test_fork(network: "mainnet", height: nil)
 ```
 
-## Common Mistakes That Silently Drop Tests
+## Common Pitfalls
 
 These errors cause the framework to skip tests without a clear error message — the test count in output will be less than the number of `test*` functions in the file.
 

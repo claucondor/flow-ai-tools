@@ -63,7 +63,7 @@ flow transactions send fund_evm.cdc 1.0 "000000000000000000000000000000000000dEa
   --signer emulator-account
 ```
 
-## Gotchas
+## Common Pitfalls
 
 **Entitlements**: `auth(BorrowValue)` is sufficient for this transaction. `Storage` is required
 only for `.storage.save()` and `.storage.load()` — not for `.storage.borrow()`.
