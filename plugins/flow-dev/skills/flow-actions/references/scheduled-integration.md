@@ -732,6 +732,9 @@ tick fee, suppresses the `Executed` event, and prevents the self-reschedule at t
 `executeTransaction` from running — terminating the chain. Use early `return` for all
 non-error conditions; reserve `panic` for logic bugs and unrecoverable state violations.
 
+> See canonical treatment in [../cadence-audit/references/forte-anti-patterns.md](../cadence-audit/references/forte-anti-patterns.md) A6.
+> This entry is a context-specific summary; updates to the underlying behavior should land in the canonical file first.
+
 ### Not calling `FlowTransactionScheduler.estimate()` before rescheduling
 
 A slot that is full at reschedule time causes `schedule()` to panic — which happens inside

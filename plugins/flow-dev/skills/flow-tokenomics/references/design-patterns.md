@@ -93,7 +93,7 @@ NFTs as governance assets with token utility.
 
 ---
 
-## Five Anti-Patterns
+## Five Tokenomics Anti-Patterns
 
 ### 1. Pure Governance (No Cash Flow)
 Governance rights alone don't drive token value.
