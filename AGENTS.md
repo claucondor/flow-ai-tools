@@ -41,6 +41,34 @@ README.md                                User-facing install + skill catalog
 CODEOWNERS                               PR review ownership (all paths)
 ```
 
+## Maintenance Discipline
+
+Before adding a new pitfall, anti-pattern, or common-error entry to any skill
+reference: **grep first.**
+
+```bash
+grep -ri "your symptom keywords" plugins/flow-dev/skills/
+```
+
+If a matching entry exists, add a one-line cross-reference instead of
+duplicating. See `CONTRIBUTING.md` for the full rule and the canonical-pointer
+format.
+
+Canonical assignments for known duplicate clusters are tracked in
+`MAINTENANCE.md`. When updating a behavior, land the change in the canonical
+file first; cross-refs remain short pointers.
+
+Heading convention: `## Common Pitfalls` (not "Anti-Patterns", not "Common
+Mistakes", not "Gotchas"). Exceptions: `## Known issues` (for upstream CLI
+bugs, tracked in per-skill `known-bugs.md` files) and `## Cadence-Specific
+Gotchas` (audit-checklist's domain-specific framing). Anti-patterns still use
+`## Anti-Patterns` headers where appropriate; pitfalls are the consumer-error
+prevention category specifically.
+
+Upstream CLI bugs (distinct from developer-error pitfalls) live in their own
+`known-bugs.md` files alongside affected skills, not in `## Common Pitfalls`
+sections.
+
 ## Plugin and Skills
 
 One plugin is registered in `.claude-plugin/marketplace.json`:
