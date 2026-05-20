@@ -46,6 +46,8 @@ OrderBook.markFilled(amount: amount)
 
 Grep every `.call(` and `EVM.dryCall(` / `.dryCall(` site. For each, verify the following statements include `result.status == EVM.Status.successful` (or `!= ...successful`) with a `panic` / `assert` branch. Captured-but-unread `let _ =` or `let result =` with no subsequent reference to `result.status` is the smell. Acceptable forms: `assert(result.status == EVM.Status.successful, ...)` or `if result.status != EVM.Status.successful { panic(...) }`.
 
+See also [evm-call.md](../flow-crossvm/references/evm-call.md) Pitfall 1 for the canonical implementation pattern.
+
 ---
 
 ## C2 — Looping `coa.call` without measuring CU (High)
@@ -155,6 +157,9 @@ For every transaction containing `coa.deposit` followed by `coa.call` in the sam
 
 ## C4 — Sharing COA auth capabilities across consumers (Critical)
 
+> See canonical treatment in [../flow-crossvm/references/coa-entitlements.md](../flow-crossvm/references/coa-entitlements.md) Anti-pattern B.
+> This entry is a context-specific summary; updates to the underlying behavior should land in the canonical file first.
+
 A protocol issues one `auth(EVM.Call) &EVM.CadenceOwnedAccount` capability and hands the same `Capability` value to multiple consumers — an escrow, a router, a frontend helper, a keeper bot. Capabilities are bearer authority. There is no per-consumer revocation when one cap is shared.
 
 ### Bad
@@ -200,6 +205,9 @@ Grep `capabilities.storage.issue<auth(EVM.` patterns in setup transactions. For 
 ---
 
 ## C5 — Publishing the COA auth capability at `/public/evm` (Critical)
+
+> See canonical treatment in [../flow-crossvm/references/coa-entitlements.md](../flow-crossvm/references/coa-entitlements.md) Anti-pattern C.
+> This entry is a context-specific summary; updates to the underlying behavior should land in the canonical file first.
 
 The canonical convention: `/storage/evm` holds the COA resource, `/public/evm` holds an un-entitled `&EVM.CadenceOwnedAccount` capability (reads + deposits, no call/withdraw/deploy). A setup script that copies an old example can `publish` an `auth(EVM.Call)` capability at `/public/evm` — at which point any account on the network can borrow it and drain the COA.
 

@@ -350,6 +350,9 @@ For richer balance scripts (per-COA, per-EVM-address), see
 1. **No `result.status` check.** The single biggest source of stuck-in-COA funds. Every code
    path that does `coa.deposit` and then `coa.call` MUST `panic` on failure.
 
+> See canonical treatment in [evm-call.md](evm-call.md) Pitfall 1.
+> This entry is a context-specific summary; updates to the underlying behavior should land in the canonical file first.
+
 2. **Borrowing the COA without `EVM.Withdraw` entitlement.** A tx that deposits and then needs
    to recover (e.g. EVM call returned a refund) will fail to withdraw. Always include
    `EVM.Withdraw` in the entitlement set when there's any chance the round trip needs to undo.

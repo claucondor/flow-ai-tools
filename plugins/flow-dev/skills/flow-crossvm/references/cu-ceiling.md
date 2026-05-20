@@ -241,6 +241,9 @@ transaction(recipients: [EVM.EVMAddress], amounts: [UInt256]) {
 ## Common Pitfalls
 
 1. **Assuming EVM gas exhaustion reverts the transaction.** It does not. Only the EVM call reverts. The Cadence transaction continues. Always `assert(result.status == EVM.Status.successful, ...)` after every `coa.call` whose success is required for protocol correctness.
+
+> See canonical treatment in [evm-call.md](evm-call.md) Pitfall 1.
+> This entry is a context-specific summary; updates to the underlying behavior should land in the canonical file first.
 2. **Setting `gasLimit` too low to "save fees".** EVM gas on Flow is generally cheap relative to the cost of a silent failure. Pick `gasLimit` based on the EVM function's **worst-case** path (longest branch, largest dynamic array), not its average.
 3. **Doing CU-heavy work between `coa.call`s.** Every Cadence operation between EVM hops eats into the same 9,999 budget. Move heavy aggregation/sorting/filtering into Solidity if you must do it inline with EVM calls.
 4. **Not budgeting for the prologue.** The fixed overhead of a transaction (signing, COA borrow, capability checks) is **~4 CU** for an empty `noop` (5-sample mean, 0% variance); add a few more for COA borrow and capability checks. The prologue itself is negligible — it is the per-call intercepts in the cost table above that dominate fixed overhead, not the prologue.
